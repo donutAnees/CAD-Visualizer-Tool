@@ -46,6 +46,18 @@ unsigned int indices[] = {
     6, 7, 3
 };
 
+GLfloat colors[] = {
+	// Colors
+	1.0f, 0.0f, 0.0f,
+	0.0f, 1.0f, 0.0f,
+	0.0f, 0.0f, 1.0f,
+	1.0f, 1.0f, 0.0f,
+	1.0f, 0.5f, 0.5f,
+	0.5f, 1.0f, 1.0f,
+	1.0f, 1.5f, 1.5f,
+	1.5f, 1.5f, 1.5f
+};
+
 void getOrthographicProj(GLdouble width, GLdouble height) {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -95,7 +107,11 @@ void render(float width, float height, Camera& camera, unsigned mode = ORTHOGRAP
     glEnableClientState(GL_VERTEX_ARRAY);
     glVertexPointer(3, GL_FLOAT, 0, vertices);
 
-    // Draw the triangle
+    // Enable and point to the color array
+    glEnableClientState(GL_COLOR_ARRAY);
+    glColorPointer(3, GL_FLOAT, 0, colors);
+
+    // Draw the model
     glDrawElements(GL_TRIANGLES, sizeof(indices)/sizeof(unsigned int), GL_UNSIGNED_INT, indices);
 
     // Disable the client state

@@ -41,6 +41,8 @@ Camera camera;
 LARGE_INTEGER frequency;  // This will hold the frequency of the high-resolution timer
 LARGE_INTEGER lastTime;   // This will store the last frame time
 float fps = 0.0f;         // Variable to store FPS
+bool isContextClicked = false;
+unsigned int mode = PERSPECTIVE_MODE;
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -219,6 +221,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
     case WM_KEYDOWN:
     {
+        if (wParam == VK_ESCAPE) {
+            isContextClicked = false;
+            ShowCursor(TRUE);
+        }
         if (wParam == VK_W)
             camera.processKeyboard(FORWARD, deltaTime);
         if (wParam == VK_S)
@@ -229,25 +235,58 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             camera.processKeyboard(RIGHT, deltaTime);
     }
     break;
+    case WM_NCHITTEST:
+    {
+        LRESULT hit = DefWindowProc(hWnd, message, wParam, lParam);
+        if (hit == HTCLIENT) {
+            // cursor hit opengl context window
+            return HTCLIENT;
+        }
+        return hit;
+    }
+    break;
+    case WM_LBUTTONDOWN: 
+    {
+        isContextClicked = true;
+        ShowCursor(FALSE);
+    }
+    break;
     case WM_MOUSEMOVE:
     {
-		POINT cursorPos;
-		GetCursorPos(&cursorPos);
-		ScreenToClient(hWnd, &cursorPos);
-		static bool firstMouse = true;
-		static float lastX = cursorPos.x;
-		static float lastY = cursorPos.y;
-		if (firstMouse)
-		{
-			lastX = cursorPos.x;
-			lastY = cursorPos.y;
-			firstMouse = false;
-		}
-		float xoffset = cursorPos.x - lastX;
-		float yoffset = lastY - cursorPos.y; // Reversed since y-coordinates go from bottom to top
-		camera.ProcessMouseMovement(xoffset, yoffset);
-		lastX = cursorPos.x;
-		lastY = cursorPos.y;
+        if (!isContextClicked) break;
+
+        static bool firstMouse = true;
+        static float lastX = 0.0f, lastY = 0.0f;
+
+        // Get the window's client area dimensions
+        RECT rect;
+        GetClientRect(hWnd, &rect);
+        int centerX = (rect.right - rect.left) / 2;
+        int centerY = (rect.bottom - rect.top) / 2;
+
+        // Get the current cursor position
+        POINT cursorPos;
+        GetCursorPos(&cursorPos);
+
+        if (firstMouse) {
+            lastX = static_cast<float>(cursorPos.x);
+            lastY = static_cast<float>(cursorPos.y);
+            firstMouse = false;
+        }
+
+        // Calculate the offset
+        float xoffset = static_cast<float>(cursorPos.x - lastX);
+        float yoffset = static_cast<float>(lastY - cursorPos.y); // Reversed since y-coordinates go from bottom to top
+
+        // Process the mouse movement
+        camera.ProcessMouseMovement(xoffset, yoffset);
+
+        // Recenter the cursor
+        SetCursorPos(centerX, centerY);
+
+        // Update the last position to the center
+        lastX = static_cast<float>(centerX);
+        lastY = static_cast<float>(centerY);
     }
     break;
     case WM_COMMAND:
@@ -262,6 +301,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_EXIT:
                 DestroyWindow(hWnd);
                 break;
+            case IDM_VIEW_ORTHO:
+                mode = ORTHOGRAPHIC_MODE;
+                break;
+            case IDM_VIEW_PERSP:
+                mode = PERSPECTIVE_MODE;
+                break;
             default:
                 return DefWindowProc(hWnd, message, wParam, lParam);
             }
@@ -273,8 +318,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         GetClientRect(hWnd, &rect); 
         float width = static_cast<float>(rect.right - rect.left);
         float height = static_cast<float>(rect.bottom - rect.top);
-        render(width, height, camera, PERSPECTIVE_MODE);
-        //render(width, height, camera, ORTHOGRAPHIC_MODE);
+        render(width, height, camera, mode);
         // Swap buffers
         SwapBuffers(hdc);
         }
@@ -302,6 +346,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // delete the rendering context  
             wglDeleteContext(hglrc);
         }
+        ShowCursor(TRUE);
 		PostQuitMessage(0); 
         break;
     default:
