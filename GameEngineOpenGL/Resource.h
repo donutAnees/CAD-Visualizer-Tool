@@ -12,6 +12,8 @@
 #define IDI_GAMEENGINEOPENGL			107
 #define IDI_SMALL				108
 #define IDC_GAMEENGINEOPENGL			109
+#define IDM_VIEW_ORTHO			200
+#define IDM_VIEW_PERSP			201
 #define IDC_MYICON				2
 #ifndef IDC_STATIC
 #define IDC_STATIC				-1
