@@ -18,18 +18,24 @@ public:
     glm::vec3 WorldUp;
 	float moveSpeed;
     float MouseSensitivity;
+    // Basically changing the FOV for perspective
+    float Zoom;
+	// Orthographic zoom factor
+	float OrthoZoom;
     // Euler angles
     float Yaw;
     float Pitch;
 
-    Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f)){
+    Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f)){
         Position = position;
         WorldUp = up;
 		moveSpeed = 45.0f;
 		MouseSensitivity = 0.1f;
+        Zoom = 45.0f;
+		OrthoZoom = 1.0f;
 		Yaw = -90.0f;
 		Pitch = 0.0f;
-		Front = glm::vec3(0.0f, 0.0f, -1.0f);
+		Front = glm::vec3(0.0f, 0.0f, 0.0f);
 		updateCameraVectors();
     }
 
@@ -68,6 +74,14 @@ public:
         }
         updateCameraVectors();
     }
+
+     void ProcessMouseScroll(float yoffset) {
+		 Zoom -= yoffset;
+		 if (Zoom < 1.0f) Zoom = 1.0f;
+		 if (Zoom > 45.0f) Zoom = 45.0f;
+		 OrthoZoom -= yoffset * 0.1f;
+		 if (OrthoZoom < 0.1f) OrthoZoom = 0.1f;
+     }
     
     void updateCameraVectors()
     {
