@@ -185,6 +185,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    QueryPerformanceCounter(&lastTime);
 
    camera = Camera();
+   initializeCubeMesh();
 
    // To enable depth testing, which can be used to determine which objects, or parts of objects, are visible
    glEnable(GL_DEPTH_TEST);
@@ -287,6 +288,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // Update the last position to the center
         lastX = static_cast<float>(centerX);
         lastY = static_cast<float>(centerY);
+    }
+    break;
+    case WM_MOUSEWHEEL: 
+    {
+        float zoomOffset = static_cast<float> (GET_WHEEL_DELTA_WPARAM(wParam)) / WHEEL_DELTA;
+        camera.ProcessMouseScroll(zoomOffset);
     }
     break;
     case WM_COMMAND:
