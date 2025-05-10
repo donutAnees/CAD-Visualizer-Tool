@@ -1,97 +1,159 @@
 #pragma once
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <iostream>
+#include <string>
+#include <sstream>
 
 enum Camera_Movement {
     FORWARD,
     BACKWARD,
     LEFT,
-    RIGHT
+    RIGHT,
+	UP,
+	DOWN
 };
+
+constexpr unsigned int PERSPECTIVE_MODE = 0;
+constexpr unsigned int ORTHOGRAPHIC_MODE = 1;
+
+
+constexpr float FOV = 45.0f;
+constexpr float NEAR_PLANE = 0.1f;
+constexpr float FAR_PLANE = 1000.0f;
 
 class Camera {
 public:
-    glm::vec3 Position;
-    glm::vec3 Front;
-    glm::vec3 Up;
-    glm::vec3 Right;
-    glm::vec3 WorldUp;
+	glm::vec3 position; // Position of the camera at the world space, the camera looks at the -z axis
+    glm::vec3 target;   // Camera look at position at the target
+	glm::vec3 angle;    // Camera angle - YAW (AROUND Y), PITCH (AROUND X), ROLL (AROUND Z)
+    float nearPlane;    // Nearest plane from camera, where the object are rendered 
+	float farPlane;     // Farthest plane from camera, where the object are rendered
 	float moveSpeed;
-    float MouseSensitivity;
-    // Basically changing the FOV for perspective
-    float Zoom;
-	// Orthographic zoom factor
-	float OrthoZoom;
-    // Euler angles
-    float Yaw;
-    float Pitch;
+    float mouseSensitivity;
+    // Tracks the FOV, can be converted to get the zoom level
+    float zoom;
+	// Camera mode - PERSPECTIVE_MODE or ORTHOGRAPHIC_MODE
+	unsigned int mode;
+	// View Matrix
+	glm::mat4 viewMatrix;
 
-    Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f)){
-        Position = position;
-        WorldUp = up;
-		moveSpeed = 45.0f;
-		MouseSensitivity = 0.1f;
-        Zoom = 45.0f;
-		OrthoZoom = 1.0f;
-		Yaw = -90.0f;
-		Pitch = 0.0f;
-		Front = glm::vec3(0.0f, 0.0f, 0.0f);
-		updateCameraVectors();
+    Camera(){
+        position = glm::vec3(0.0f, 0.0f, -5.0f);
+        angle = glm::vec3(0.0f, 90.0f, 0.0f);
+		moveSpeed = 10.0f;
+		mouseSensitivity = 0.1f;
+        zoom = FOV;
+        nearPlane = NEAR_PLANE;
+        farPlane = FAR_PLANE;
+		mode = PERSPECTIVE_MODE;
+		updateViewMatrix();
     }
 
-    glm::mat4 getViewMatrix()
-    {
-        return glm::lookAt(Position, Position + Front, Up);
-    }
+	void setCameraPosition(float x, float y, float z) {
+		position = glm::vec3(x, y, z);
+	}
 
-    void processKeyboard(Camera_Movement direction, float deltaTime)
-    {
-        float velocity = moveSpeed * deltaTime;
-        if (direction == FORWARD)
-            Position += Front * velocity;
-        if (direction == BACKWARD)
-            Position -= Front * velocity;
-        if (direction == LEFT)
-            Position -= Right * velocity;
-        if (direction == RIGHT)
-            Position += Right * velocity;
-    }
+	void setCameraAngle(float yaw, float pitch, float roll) {
+		angle = glm::vec3(yaw, pitch, roll);
+	}
 
-    void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true)
-    {
-        xoffset *= MouseSensitivity;
-        yoffset *= MouseSensitivity;
+	void setCameraYaw(float yaw) {
+		angle.y = yaw;
+	}
 
-        Yaw += xoffset;
-        Pitch += yoffset;
+	void setCameraPitch(float pitch) {
+		angle.x = pitch;
+	}
 
-        if (constrainPitch)
-        {
-            if (Pitch > 89.0f)
-                Pitch = 89.0f;
-            if (Pitch < -89.0f)
-                Pitch = -89.0f;
-        }
-        updateCameraVectors();
-    }
+	void setCameraRoll(float roll) {
+		angle.z = roll;
+	}
 
-     void ProcessMouseScroll(float yoffset) {
-		 Zoom -= yoffset;
-		 if (Zoom < 1.0f) Zoom = 1.0f;
-		 if (Zoom > 45.0f) Zoom = 45.0f;
-		 OrthoZoom -= yoffset * 0.1f;
-		 if (OrthoZoom < 0.1f) OrthoZoom = 0.1f;
-     }
-    
-    void updateCameraVectors()
-    {
-        glm::vec3 front;
-		front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
-        front.y = sin(glm::radians(Pitch));
-        front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
-        Front = glm::normalize(front);
-        Right = glm::normalize(glm::cross(Front, WorldUp)); 
-        Up = glm::normalize(glm::cross(Right, Front));
-    }
+	void setCameraZoom(float zoom) {
+		this->zoom = zoom;
+	}
 
-};
+	void setCameraNearPlane(float nearPlane) {
+		this->nearPlane = nearPlane;
+	}
+
+	void setCameraFarPlane(float farPlane) {
+		this->farPlane = farPlane;
+	}
+
+	void setCameraMoveSpeed(float speed) {
+		moveSpeed = speed;
+	}
+
+	void setCameraMouseSensitivity(float sensitivity) {
+		mouseSensitivity = sensitivity;
+	}
+
+	void setCameraMode(unsigned int mode) {
+		this->mode = mode;
+	}
+
+	// Rotate the camera using delta x and y (in degrees), affects pitch and yaw
+	void rotateBy(float dx, float dy) {
+		angle.x += dy * mouseSensitivity; // pitch (around X)
+		angle.y += dx * mouseSensitivity; // yaw (around Y)
+
+		// Clamp pitch to avoid flipping
+		if (angle.x > 89.0f) angle.x = 89.0f;
+		if (angle.x < -89.0f) angle.x = -89.0f;
+
+		// Update the view matrix after rotation
+		updateViewMatrix();
+	}
+
+	void move(Camera_Movement direction, float deltaTime) {
+		glm::vec3 front;
+		front.x = cos(glm::radians(angle.y)) * cos(glm::radians(angle.x));
+		front.y = sin(glm::radians(angle.x));
+		front.z = sin(glm::radians(angle.y)) * cos(glm::radians(angle.x));
+		front = glm::normalize(front);
+
+		glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+		glm::vec3 right = glm::normalize(glm::cross(front, worldUp));
+		glm::vec3 up = glm::normalize(glm::cross(right, front));
+
+		float velocity = moveSpeed * deltaTime;
+
+		if (direction == FORWARD)
+			position += front * velocity;
+		if (direction == BACKWARD)
+			position -= front * velocity;
+		if (direction == LEFT)
+			position -= right * velocity;
+		if (direction == RIGHT)
+			position += right * velocity;
+		if (direction == UP)
+			position += up * velocity;
+		if (direction == DOWN)
+			position -= up * velocity;
+
+		// Update the view matrix after moving
+		updateViewMatrix();
+	}
+
+	glm::mat4 getViewMatrix() {
+		return viewMatrix;
+	}
+
+	// We are using a free look camera, therefore Euler angles are used to calculate the camera direction
+	void updateViewMatrix() {
+		glm::vec3 front;
+		front.x = cos(glm::radians(angle.y)) * cos(glm::radians(angle.x));
+		front.y = sin(glm::radians(angle.x));
+		front.z = sin(glm::radians(angle.y)) * cos(glm::radians(angle.x));
+		front = glm::normalize(front);
+
+		glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+		glm::vec3 right = glm::normalize(glm::cross(front, worldUp));
+		glm::vec3 up = glm::normalize(glm::cross(right, front));
+
+		viewMatrix = glm::lookAt(position, position + front, up);
+	}
+
+ };

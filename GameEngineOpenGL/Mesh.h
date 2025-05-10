@@ -3,6 +3,7 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 #include <vector>
+#include <sstream>
 
 class Mesh {
 public:
@@ -11,51 +12,43 @@ public:
     std::vector<GLfloat> colors;
     std::vector<unsigned int> indices;
 
-    // OpenGL resources
-    GLuint displayListID;
-
     // Constructor
-    Mesh() : displayListID(0) {}
+    Mesh() {}
 
     // Destructor
     ~Mesh() {
         cleanup();
     }
 
-    // Initialize the mesh (create display list)
-    void initialize() {
-		// Enable and point to the vertex array
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glVertexPointer(3, GL_FLOAT, 0, vertices.data());
+	// Set vertices and colors
+	void setVertices(const std::vector<GLfloat>& vertices) {
+		this->vertices = vertices;
+	}
 
-		// Enable and point to the color array
-		glEnableClientState(GL_COLOR_ARRAY);
-		glColorPointer(3, GL_FLOAT, 0, colors.data());
+	void setColors(const std::vector<GLfloat>& colors) {
+		this->colors = colors;
+	}
 
-        if (displayListID == 0) {
-            displayListID = glGenLists(1);
-            glNewList(displayListID, GL_COMPILE);
-            // Draw the model
-            glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, indices.data());
-            // Disable the client state
-            glEndList();
-        }
-		glDisableClientState(GL_VERTEX_ARRAY);
-		glDisableClientState(GL_COLOR_ARRAY);
-    }
+	// Set indices
+	void setIndices(const std::vector<unsigned int>& indices) {
+		this->indices = indices;
+	}
 
     // Render the mesh
-    void render() const {
-        if (displayListID != 0) {
-            glCallList(displayListID);
-        }
+    void draw() const {
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glVertexPointer(3, GL_FLOAT, 0, vertices.data());
+
+        // Enable and point to the color array
+        glEnableClientState(GL_COLOR_ARRAY);
+        glColorPointer(3, GL_FLOAT, 0, colors.data());
+        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, indices.data());
+        glDisableClientState(GL_VERTEX_ARRAY);
+        glDisableClientState(GL_COLOR_ARRAY);
+
     }
 
     // Cleanup resources
     void cleanup() {
-        if (displayListID != 0) {
-            glDeleteLists(displayListID, 1);
-            displayListID = 0;
-        }
     }
 };
