@@ -132,12 +132,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="camera.h" />
+    <ClInclude Include="controller.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GameEngineOpenGL.h" />
     <ClInclude Include="Mesh.h" />
-    <ClInclude Include="rendering.h" />
+    <ClInclude Include="model.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="view.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GameEngineOpenGL.cpp" />
