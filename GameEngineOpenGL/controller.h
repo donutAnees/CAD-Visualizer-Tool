@@ -3,6 +3,9 @@
 #include "view.h"
 #include <windows.h>
 #include <thread>
+#include <commdlg.h>
+#include <string>
+
 
 class Controller {
 public:
@@ -89,6 +92,7 @@ public:
 	void handleMouseDown(WPARAM state, float x, float y) {
 		mouseX = x;
 		mouseY = y;
+		model->handleMouseDown(state, x, y);
 	}
 
 	void createDialogHandle(wchar_t* objectType, int x, int y, int z, int size) {
@@ -103,6 +107,40 @@ public:
 		else
 		{
 			MessageBox(parentHandle, L"Invalid object type", L"Error", MB_OK);
+		}
+	}
+
+	std::wstring openFileExplorer() {
+		// Initialize the OPENFILENAME structure
+		OPENFILENAME ofn;
+		wchar_t filePath[MAX_PATH] = L"";
+		ZeroMemory(&ofn, sizeof(ofn));
+		ofn.lStructSize = sizeof(ofn);
+		ofn.hwndOwner = NULL; // No specific owner window
+		ofn.lpstrFile = filePath;
+		ofn.nMaxFile = MAX_PATH;
+		ofn.lpstrFilter = L"STL Files\0*.stl\0All Files\0*.*\0";
+		ofn.nFilterIndex = 1;
+		ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+		// Display the file dialog
+		if (GetOpenFileName(&ofn)) {
+			// Return the selected file path
+			return std::wstring(filePath);
+		}
+		else {
+			// Return an empty string if the user cancels
+			return L"";
+		}
+	}
+
+	void createFromFile() {
+		std::wstring filePath = openFileExplorer();
+		if (!filePath.empty()) {
+			model->createFromFile(filePath);
+		}
+		else {
+			MessageBox(parentHandle, L"No file selected", L"Error", MB_OK);
 		}
 	}
 };

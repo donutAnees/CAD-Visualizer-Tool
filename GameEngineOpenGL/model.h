@@ -62,6 +62,7 @@ public:
 		// Draw the meshes
 		for (const auto& mesh : meshes) {
 			mesh.draw();
+			mesh.drawLocalAxis(); // Draw local axis for each mesh
 		}
 	}
 
@@ -115,10 +116,7 @@ public:
             4, 5, 1, 4, 1, 0
         };
 
-        mesh.setVertices(vertices);
-        mesh.setColors(colors);
-        mesh.setIndices(indices);
-
+		mesh.init(vertices, colors, indices);
         meshes.push_back(mesh);
     }
 
@@ -159,5 +157,27 @@ public:
        mesh.setColors(colors);
        mesh.setIndices(indices);
        meshes.push_back(mesh);
+    }
+
+    void handleMouseDown(WPARAM state, int x, int y) {
+		for (auto& mesh : meshes) {
+			Mesh* pickedMesh = mesh.performObjectPicking(x, y);
+			if (pickedMesh) {
+				// Handle the picked mesh (e.g., change color, highlight, etc.)
+				MessageBox(NULL, L"Mesh picked!", L"Info", MB_OK);
+				break;
+			}
+		}
+    }
+
+    void createFromFile(std::wstring filePath) {
+	Mesh mesh;
+	if (mesh.loadFromSTL(std::string(filePath.begin(), filePath.end()))) {
+		meshes.push_back(mesh);
+		MessageBox(NULL, L"File loaded successfully!", L"Info", MB_OK);
+	} 
+    else {
+		MessageBox(NULL, L"Failed to load the file.", L"Error", MB_OK);
+	}
     }
 };
