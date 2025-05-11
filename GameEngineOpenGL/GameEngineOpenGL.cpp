@@ -225,6 +225,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_OBJECT_DIALOG), hWnd, ObjectDialogProc);
             }
                 break;
+            case ID_CREATE_FILE: {
+                controller.createFromFile();
+            }
+				break;
             default:
                 return DefWindowProc(hWnd, message, wParam, lParam);
             }
@@ -237,7 +241,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		EndPaint(hWnd, &ps);
     }
     break;
-	case WM_SIZE:
 	{
 		RECT rect;
 		GetClientRect(hWnd, &rect);    
