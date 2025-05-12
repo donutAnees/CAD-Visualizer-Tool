@@ -32,6 +32,8 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK    ChildWndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ObjectDialogProc(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK SidebarDialogProc(HWND, UINT, WPARAM, LPARAM);
+
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -171,10 +173,16 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		return FALSE;
 	}
 
+   HWND hSidebar = CreateDialog(hInst, MAKEINTRESOURCE(IDD_SIDEBAR_DIALOG), hWnd, SidebarDialogProc);
+   if (!hSidebar) {
+	   return FALSE;
+   }
+
    // Initialize the Controller, this will set the context and run opengl as a separate thread
-   if (!controller.create(hChildWnd, hWnd)) {
+   if (controller.create(hChildWnd, hWnd, hSidebar)) {
        MessageBox(NULL, L"Failed to set opengl thread", L"Error", MB_OK);
    }
+   SetWindowPos(hSidebar, HWND_TOP, 0, 0, 280, 700, SWP_SHOWWINDOW);
    ShowWindow(hChildWnd, nCmdShow);
    UpdateWindow(hChildWnd);
    ShowWindow(hWnd, nCmdShow);
@@ -241,6 +249,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		EndPaint(hWnd, &ps);
     }
     break;
+    case WM_SIZE:
 	{
 		RECT rect;
 		GetClientRect(hWnd, &rect);    
@@ -338,6 +347,50 @@ INT_PTR CALLBACK ObjectDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
         {
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;
+        }
+        break;
+    }
+    return (INT_PTR)FALSE;
+}
+
+INT_PTR CALLBACK SidebarDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_INITDIALOG:
+    {
+        HWND hList = GetDlgItem(hDlg, IDC_OBJECT_LIST);
+        for (size_t i = 0; i < model.meshes.size(); ++i) {
+            std::wstringstream ss;
+            ss << L"Object " << (i + 1);
+            SendMessage(hList, LB_ADDSTRING, 0, (LPARAM)ss.str().c_str());
+        }
+    }
+    return (INT_PTR)TRUE;
+
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDC_OBJECT_LIST && HIWORD(wParam) == LBN_SELCHANGE)
+        {
+            HWND hList = GetDlgItem(hDlg, IDC_OBJECT_LIST);
+            int sel = (int)SendMessage(hList, LB_GETCURSEL, 0, 0);
+            if (sel >= 0 && sel < (int)model.meshes.size()) {
+                const Mesh& mesh = model.meshes[sel];
+
+                // Size
+                SetDlgItemInt(hDlg, IDC_SIZE_X, (int)mesh.sizeX, TRUE);
+                SetDlgItemInt(hDlg, IDC_SIZE_Y, (int)mesh.sizeY, TRUE);
+                SetDlgItemInt(hDlg, IDC_SIZE_Z, (int)mesh.sizeZ, TRUE);
+
+                // Rotation
+                SetDlgItemInt(hDlg, IDC_ROT_X, (int)mesh.rotationX, TRUE);
+                SetDlgItemInt(hDlg, IDC_ROT_Y, (int)mesh.rotationY, TRUE);
+                SetDlgItemInt(hDlg, IDC_ROT_Z, (int)mesh.rotationZ, TRUE);
+
+                // Position (center)
+                SetDlgItemInt(hDlg, IDC_POS_X, (int)mesh.centerX, TRUE);
+                SetDlgItemInt(hDlg, IDC_POS_Y, (int)mesh.centerY, TRUE);
+                SetDlgItemInt(hDlg, IDC_POS_Z, (int)mesh.centerZ, TRUE);
+            }
         }
         break;
     }

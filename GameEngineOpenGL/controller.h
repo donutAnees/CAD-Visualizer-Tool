@@ -15,11 +15,12 @@ public:
 	bool loopThreadFlag;
 	HWND handle;
 	HWND parentHandle;
+	HWND sidebarHandle;
 	int mouseX;
 	int mouseY;
 
 	Controller(Model* model, View* view) : model(model), view(view), mouseX(0), mouseY(0),
-										   handle(NULL), parentHandle(NULL){
+										   handle(NULL), parentHandle(NULL), sidebarHandle(NULL){
 
 	}
 
@@ -31,9 +32,10 @@ public:
         }
 	}
 
-	int create(HWND handle, HWND parentHandle) {
+	int create(HWND handle, HWND parentHandle, HWND sidebarHandle) {
 		this->handle = handle;
 		this->parentHandle = parentHandle;
+		this->sidebarHandle = sidebarHandle;
 		// Create a context
 		if (!view->setContext(handle)) {
 			MessageBox(NULL, L"Failed to set context", L"Error", MB_OK);
@@ -110,10 +112,12 @@ public:
 		if (wcscmp(objectType, L"Cube") == 0)
 		{
 			model->createCube(x,y,z,size);
+			updateSidebar();
 		}
 		else if (wcscmp(objectType, L"Pyramid") == 0)
 		{
 			model->createPyramid(x, y, z, size);
+			updateSidebar();
 		}
 		else
 		{
@@ -149,9 +153,25 @@ public:
 		std::wstring filePath = openFileExplorer();
 		if (!filePath.empty()) {
 			model->createFromFile(filePath);
+			updateSidebar();
 		}
 		else {
 			MessageBox(parentHandle, L"No file selected", L"Error", MB_OK);
 		}
 	}
+
+	// Update the sidebar with the list of objects
+	void updateSidebar() {
+		HWND hList = GetDlgItem(sidebarHandle, IDC_OBJECT_LIST);
+		if (!hList) return;
+
+		SendMessage(hList, LB_RESETCONTENT, 0, 0);
+
+		for (size_t i = 0; i < model->meshes.size(); ++i) {
+			std::wstringstream ss;
+			ss << L"Object " << (i + 1);
+			SendMessage(hList, LB_ADDSTRING, 0, (LPARAM)ss.str().c_str());
+		}
+	}
+
 };

@@ -22,6 +22,18 @@
 #define IDC_SIZE                        1004
 #define ID_CREATE_FILE                  32771
 #define IDC_STATIC                      -1
+#define IDD_SIDEBAR_DIALOG				400
+#define IDC_OBJECT_LIST					401
+#define IDC_PROPERTY_TEXT				402
+#define IDC_SIZE_X						2001
+#define IDC_SIZE_Y						2002
+#define IDC_SIZE_Z						2003
+#define IDC_ROT_X						2004
+#define IDC_ROT_Y						2005
+#define IDC_ROT_Z						2006
+#define IDC_POS_X						2007
+#define IDC_POS_Y						2008
+#define IDC_POS_Z						2009
 
 // Next default values for new objects
 // 
