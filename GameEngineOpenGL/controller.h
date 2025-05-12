@@ -18,8 +18,17 @@ public:
 	int mouseX;
 	int mouseY;
 
-	Controller(Model* model, View* view) : model(model), view(view), mouseX(0), mouseY(0) {
+	Controller(Model* model, View* view) : model(model), view(view), mouseX(0), mouseY(0),
+										   handle(NULL), parentHandle(NULL){
 
+	}
+
+	~Controller() {
+        loopThreadFlag = false; // Signal the thread to stop
+        if (thread.joinable())
+        {
+			thread.join(); // Wait for the thread to finish
+        }
 	}
 
 	int create(HWND handle, HWND parentHandle) {
@@ -33,7 +42,7 @@ public:
 		// Create a separate thread for the OpenGL context
 		thread = std::thread(&Controller::runThread, this);
 		loopThreadFlag = true;
-		return 1;
+		return 0;
 	}
 
 	void runThread() {
@@ -77,7 +86,8 @@ public:
 			break;
 		}
 	}
-
+	
+	// Handles camera rotation based on mouse movement
 	void handleMouseInput(WPARAM state, float x, float y) {
 		if (state == MK_LBUTTON)
 		{
@@ -89,6 +99,7 @@ public:
 		}
 	}
 	
+	// Handles mouse button down events, for object selection or other actions
 	void handleMouseDown(WPARAM state, float x, float y) {
 		mouseX = x;
 		mouseY = y;
