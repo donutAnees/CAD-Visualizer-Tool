@@ -19,6 +19,7 @@ public:
 	GLfloat minX, maxX, minY, maxY, minZ, maxZ; // Bounding box coordinates
 	GLfloat centerX, centerY, centerZ; // Center of the mesh
 	GLfloat sizeX, sizeY, sizeZ; // Size of the mesh in each dimension
+	GLfloat rotationX, rotationY, rotationZ; // Rotation angles in degrees
 
     // Constructor
     Mesh() {}
@@ -55,9 +56,14 @@ public:
         centerZ = (minZ + maxZ) / 2.0f;
         
         // Calculate the size of the object
-        sizeX = (maxX - minX) / 2.0f;
-        sizeY = (maxY - minY) / 2.0f;
-        sizeZ = (maxZ - minZ) / 2.0f;
+        sizeX = maxX - minX;
+        sizeY = maxY - minY;
+        sizeZ = maxZ - minZ;
+
+		// Set the rotation angles to 0
+		rotationX = 0.0f;
+		rotationY = 0.0f;
+		rotationZ = 0.0f;
 
     }
 

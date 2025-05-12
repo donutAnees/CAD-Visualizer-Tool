@@ -153,9 +153,7 @@ public:
            4, 3, 0,
            4, 0, 1
        };
-       mesh.setVertices(vertices);
-       mesh.setColors(colors);
-       mesh.setIndices(indices);
+       mesh.init(vertices, colors, indices);
        meshes.push_back(mesh);
     }
 
@@ -171,13 +169,13 @@ public:
     }
 
     void createFromFile(std::wstring filePath) {
-	Mesh mesh;
-	if (mesh.loadFromSTL(std::string(filePath.begin(), filePath.end()))) {
-		meshes.push_back(mesh);
-		MessageBox(NULL, L"File loaded successfully!", L"Info", MB_OK);
-	} 
-    else {
-		MessageBox(NULL, L"Failed to load the file.", L"Error", MB_OK);
-	}
+		Mesh mesh;
+		if (mesh.loadFromSTL(std::string(filePath.begin(), filePath.end()))) {
+			meshes.push_back(mesh);
+			MessageBox(NULL, L"File loaded successfully!", L"Info", MB_OK);
+		} 
+		else {
+			MessageBox(NULL, L"Failed to load the file.", L"Error", MB_OK);
+		}
     }
 };
