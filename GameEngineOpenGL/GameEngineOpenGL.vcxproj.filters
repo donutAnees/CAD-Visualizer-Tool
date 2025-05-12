@@ -13,34 +13,46 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\model">
+      <UniqueIdentifier>{58307b26-f8a6-49bf-a6c8-1588b8c8025b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\core">
+      <UniqueIdentifier>{693a1394-bbba-4111-a022-7165926f0a92}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\view">
+      <UniqueIdentifier>{c1a8b7ff-8cfa-43e8-b5ff-e3582da09fc2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\controller">
+      <UniqueIdentifier>{c8ce0779-55fd-4f00-94d5-60a30b5b0dab}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="framework.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="targetver.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Resource.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="GameEngineOpenGL.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="camera.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Mesh.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="view.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\model</Filter>
     </ClInclude>
     <ClInclude Include="model.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\model</Filter>
+    </ClInclude>
+    <ClInclude Include="camera.h">
+      <Filter>Header Files\model</Filter>
+    </ClInclude>
+    <ClInclude Include="targetver.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="GameEngineOpenGL.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="Resource.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="view.h">
+      <Filter>Header Files\view</Filter>
+    </ClInclude>
+    <ClInclude Include="framework.h">
+      <Filter>Header Files\core</Filter>
     </ClInclude>
     <ClInclude Include="controller.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\controller</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

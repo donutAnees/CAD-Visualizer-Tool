@@ -255,11 +255,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	break;
     case WM_DESTROY:
-        controller.loopThreadFlag = false; // Signal the thread to stop
-        if (controller.thread.joinable())
-        {
-        controller.thread.join(); // Wait for the thread to finish
-        }
 		PostQuitMessage(0); 
         break;
     default:
