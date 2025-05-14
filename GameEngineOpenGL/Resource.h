@@ -15,25 +15,26 @@
 #define IDM_VIEW_ORTHO                  310
 #define IDM_VIEW_PERSP                  311
 #define IDM_OBJECT                      320
+#define IDD_SIDEBAR_DIALOG              400
+#define IDC_OBJECT_LIST                 401
+#define IDC_PROPERTY_TEXT               402
 #define IDC_OBJECT_TYPE                 1000
 #define IDC_POSITION_X                  1001
 #define IDC_POSITION_Y                  1002
 #define IDC_POSITION_Z                  1003
 #define IDC_SIZE                        1004
+#define IDC_SIZE_X                      2001
+#define IDC_SIZE_Y                      2002
+#define IDC_SIZE_Z                      2003
+#define IDC_ROT_X                       2004
+#define IDC_ROT_Y                       2005
+#define IDC_ROT_Z                       2006
+#define IDC_POS_X                       2007
+#define IDC_POS_Y                       2008
+#define IDC_POS_Z                       2009
+#define IDC_ROT_X2                      2010
 #define ID_CREATE_FILE                  32771
 #define IDC_STATIC                      -1
-#define IDD_SIDEBAR_DIALOG				400
-#define IDC_OBJECT_LIST					401
-#define IDC_PROPERTY_TEXT				402
-#define IDC_SIZE_X						2001
-#define IDC_SIZE_Y						2002
-#define IDC_SIZE_Z						2003
-#define IDC_ROT_X						2004
-#define IDC_ROT_Y						2005
-#define IDC_ROT_Z						2006
-#define IDC_POS_X						2007
-#define IDC_POS_Y						2008
-#define IDC_POS_Z						2009
 
 // Next default values for new objects
 // 

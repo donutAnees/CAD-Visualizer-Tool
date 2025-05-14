@@ -9,6 +9,7 @@
 #include <iostream>
 #include <windows.h>
 #include <sstream>
+#include <ostream>
 
 #pragma comment(lib, "opengl32.lib")
 #pragma comment(lib, "glu32.lib") 
@@ -182,7 +183,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    if (controller.create(hChildWnd, hWnd, hSidebar)) {
        MessageBox(NULL, L"Failed to set opengl thread", L"Error", MB_OK);
    }
-   SetWindowPos(hSidebar, HWND_TOP, 0, 0, 280, 700, SWP_SHOWWINDOW);
+   SetWindowPos(hSidebar, HWND_TOP, 0, 0, 265, 700, SWP_SHOWWINDOW);
    ShowWindow(hChildWnd, nCmdShow);
    UpdateWindow(hChildWnd);
    ShowWindow(hWnd, nCmdShow);
@@ -376,11 +377,6 @@ INT_PTR CALLBACK SidebarDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARA
             if (sel >= 0 && sel < (int)model.meshes.size()) {
                 const Mesh& mesh = model.meshes[sel];
 
-                // Size
-                SetDlgItemInt(hDlg, IDC_SIZE_X, (int)mesh.sizeX, TRUE);
-                SetDlgItemInt(hDlg, IDC_SIZE_Y, (int)mesh.sizeY, TRUE);
-                SetDlgItemInt(hDlg, IDC_SIZE_Z, (int)mesh.sizeZ, TRUE);
-
                 // Rotation
                 SetDlgItemInt(hDlg, IDC_ROT_X, (int)mesh.rotationX, TRUE);
                 SetDlgItemInt(hDlg, IDC_ROT_Y, (int)mesh.rotationY, TRUE);
@@ -390,6 +386,40 @@ INT_PTR CALLBACK SidebarDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARA
                 SetDlgItemInt(hDlg, IDC_POS_X, (int)mesh.centerX, TRUE);
                 SetDlgItemInt(hDlg, IDC_POS_Y, (int)mesh.centerY, TRUE);
                 SetDlgItemInt(hDlg, IDC_POS_Z, (int)mesh.centerZ, TRUE);
+            }
+        }
+        // Handle property edit box changes
+        if (HIWORD(wParam) == EN_KILLFOCUS) {
+            HWND hList = GetDlgItem(hDlg, IDC_OBJECT_LIST);
+            int sel = (int)SendMessage(hList, LB_GETCURSEL, 0, 0);
+            if (sel >= 0 && sel < (int)model.meshes.size()) {
+                Mesh& mesh = model.meshes[sel];
+
+                // Get new values from edit boxes
+                wchar_t buf[32];
+ 
+                // Rotation
+                GetDlgItemText(hDlg, IDC_ROT_X, buf, 32);
+                mesh.rotationX = (float)_wtof(buf);
+                GetDlgItemText(hDlg, IDC_ROT_Y, buf, 32);
+                mesh.rotationY = (float)_wtof(buf);
+                GetDlgItemText(hDlg, IDC_ROT_Z, buf, 32);
+                mesh.rotationZ = (float)_wtof(buf);
+
+                // Position
+                GetDlgItemText(hDlg, IDC_POS_X, buf, 32);
+                mesh.centerX = (float)_wtof(buf);
+                GetDlgItemText(hDlg, IDC_POS_Y, buf, 32);
+                mesh.centerY = (float)_wtof(buf);
+                GetDlgItemText(hDlg, IDC_POS_Z, buf, 32);
+                mesh.centerZ = (float)_wtof(buf);
+
+                // Update the mesh geometry
+                mesh.updateMesh();
+
+				// Recalculate the bounding box
+				mesh.calculateBounds();
+
             }
         }
         break;

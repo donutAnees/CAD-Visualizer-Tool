@@ -13,6 +13,8 @@ class Mesh {
 public:
     // Data
     std::vector<GLfloat> vertices;
+	// Transformed vertices, so that we can apply transformations to the original vertices
+    std::vector<GLfloat> transformedVertices; 
     std::vector<GLfloat> colors;
     std::vector<unsigned int> indices;
 	bool isTransparent = false; 
@@ -26,50 +28,79 @@ public:
 
     // Destructor
     ~Mesh() {
-        cleanup();
+		vertices.clear();
+		transformedVertices.clear();
+		indices.clear();
+		colors.clear();
     }
+
+    void calculateBounds() {
+        minX = transformedVertices[0];
+        maxX = transformedVertices[0];
+        minY = transformedVertices[1];
+        maxY = transformedVertices[1];
+        minZ = transformedVertices[2];
+        maxZ = transformedVertices[2];
+
+        for (size_t i = 0; i < transformedVertices.size(); i += 3) {
+            minX = std::min(minX, transformedVertices[i]);
+            maxX = std::max(maxX, transformedVertices[i]);
+            minY = std::min(minY, transformedVertices[i + 1]);
+            maxY = std::max(maxY, transformedVertices[i + 1]);
+            minZ = std::min(minZ, transformedVertices[i + 2]);
+            maxZ = std::max(maxZ, transformedVertices[i + 2]);
+        }
+
+        // Calculate the size of the object
+        sizeX = maxX - minX;
+        sizeY = maxY - minY;
+        sizeZ = maxZ - minZ;
+
+    }
+
+    glm::vec3 computeOriginalCenter() {
+        float minX = vertices[0], maxX = vertices[0];
+        float minY = vertices[1], maxY = vertices[1];
+        float minZ = vertices[2], maxZ = vertices[2];
+
+        for (size_t i = 0; i < vertices.size(); i += 3) {
+            float x = vertices[i];
+            float y = vertices[i + 1];
+            float z = vertices[i + 2];
+
+            if (x < minX) minX = x; if (x > maxX) maxX = x;
+            if (y < minY) minY = y; if (y > maxY) maxY = y;
+            if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+        }
+
+        return glm::vec3((minX + maxX) / 2.0f, (minY + maxY) / 2.0f, (minZ + maxZ) / 2.0f);
+    }
+
 
     void init(const std::vector<GLfloat>& vertices, const std::vector<GLfloat>& colors, const std::vector<unsigned int>& indices) {
 		this->vertices = vertices;
+		this->transformedVertices = vertices; // Initialize transformed vertices with original vertices
 		this->colors = colors;
 		this->indices = indices;
-        // Calculate the bounds of the object
-        minX = vertices[0];
-        maxX = vertices[0];
-        minY = vertices[1];
-        maxY = vertices[1];
-        minZ = vertices[2];
-        maxZ = vertices[2];
 
-        for (size_t i = 0; i < vertices.size(); i += 3) {
-            minX = std::min(minX, vertices[i]);
-            maxX = std::max(maxX, vertices[i]);
-            minY = std::min(minY, vertices[i + 1]);
-            maxY = std::max(maxY, vertices[i + 1]);
-            minZ = std::min(minZ, vertices[i + 2]);
-            maxZ = std::max(maxZ, vertices[i + 2]);
-        }
+		// Calculate the bounding box
+		calculateBounds();
 
         // Calculate the center of the object
         centerX = (minX + maxX) / 2.0f;
         centerY = (minY + maxY) / 2.0f;
         centerZ = (minZ + maxZ) / 2.0f;
         
-        // Calculate the size of the object
-        sizeX = maxX - minX;
-        sizeY = maxY - minY;
-        sizeZ = maxZ - minZ;
-
 		// Set the rotation angles to 0
 		rotationX = 0.0f;
 		rotationY = 0.0f;
 		rotationZ = 0.0f;
-
     }
 
 	// Set vertices and colors
 	void setVertices(const std::vector<GLfloat>& vertices) {
 		this->vertices = vertices;
+		this->transformedVertices = vertices;
 	}
 
 	void setColors(const std::vector<GLfloat>& colors) {
@@ -84,7 +115,7 @@ public:
     // Render the mesh
     void draw() const {
         glEnableClientState(GL_VERTEX_ARRAY);
-        glVertexPointer(3, GL_FLOAT, 0, vertices.data());
+        glVertexPointer(3, GL_FLOAT, 0, transformedVertices.data());
 
         // Enable and point to the color array
         glEnableClientState(GL_COLOR_ARRAY);
@@ -96,7 +127,6 @@ public:
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 			glColor4f(1.0f, 1.0f, 1.0f, 0.5f); // Set transparency (alpha = 0.5)
         }
-
 
         glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, indices.data());
 
@@ -119,17 +149,17 @@ public:
         // X-axis (red) scaled to the object's size
         glColor3f(1.0f, 0.0f, 0.0f);
         glVertex3f(centerX, centerY, centerZ);
-        glVertex3f(centerX + sizeX, centerY, centerZ);
+        glVertex3f(centerX + 2, centerY, centerZ);
 
         // Y-axis (green) scaled to the object's size
         glColor3f(0.0f, 1.0f, 0.0f);
         glVertex3f(centerX, centerY, centerZ);
-        glVertex3f(centerX, centerY + sizeY, centerZ);
+        glVertex3f(centerX, centerY + 2, centerZ);
 
         // Z-axis (blue) scaled to the object's size
         glColor3f(0.0f, 0.0f, 1.0f);
         glVertex3f(centerX, centerY, centerZ);
-        glVertex3f(centerX, centerY, centerZ + sizeZ);
+        glVertex3f(centerX, centerY, centerZ + 2);
 
         glEnd();
     }
@@ -230,20 +260,48 @@ public:
         file.close();
 
         init(vertices, colors, indices);
-		MessageBox(NULL, L"File loaded successfully!", L"Info", MB_OK);
-
         return true;
+    }
+
+    void updateMesh() {
+        if (vertices.empty()) {
+            return;
+        }
+
+        float rx = glm::radians(rotationX);
+        float ry = glm::radians(rotationY);
+        float rz = glm::radians(rotationZ);
+
+        // Rotation matrices
+        glm::mat4 rotX = glm::rotate(glm::mat4(1.0f), rx, glm::vec3(1.0f, 0.0f, 0.0f));
+        glm::mat4 rotY = glm::rotate(glm::mat4(1.0f), ry, glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 rotZ = glm::rotate(glm::mat4(1.0f), rz, glm::vec3(0.0f, 0.0f, 1.0f));
+
+        // Combine rotations
+        glm::mat4 rotationMatrix = rotZ * rotY * rotX;
+
+        glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(centerX, centerY, centerZ)) *
+                                rotationMatrix *
+			// Rotation must happen around the center of the object
+			// Since the object is centered at X,Y,Z, we first convert it to 0,0,0
+			// Then we rotate it, and finally move it back to the original position
+            glm::translate(glm::mat4(1.0f), -computeOriginalCenter());
+
+        glm::vec3 center(centerX, centerY, centerZ);
+        
+        for (size_t i = 0; i < vertices.size(); i += 3) {
+            glm::vec4 vertex = glm::vec4(vertices[i], vertices[i + 1], vertices[i + 2], 1.0f);
+            glm::vec4 transformed = modelMatrix * vertex;
+
+            transformedVertices[i] = transformed.x;
+            transformedVertices[i + 1] = transformed.y;
+            transformedVertices[i + 2] = transformed.z;
+        }
     }
 
     Mesh* performObjectPicking(int mouseX, int mouseY) {
 		// Check if the mouse coordinates intersect with the mesh's bounding box
 		// If it does, return this mesh; otherwise, return nullptr
         return nullptr;
-    }
-
-
-
-    // Cleanup resources
-    void cleanup() {
     }
 };
