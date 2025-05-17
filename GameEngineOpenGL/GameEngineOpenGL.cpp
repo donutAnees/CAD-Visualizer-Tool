@@ -388,6 +388,14 @@ INT_PTR CALLBACK SidebarDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARA
                 SetDlgItemInt(hDlg, IDC_POS_Z, (int)mesh.centerZ, TRUE);
             }
         }
+        switch (LOWORD(wParam)) {
+		case IDC_BTN_BOUNDINGBOX:
+			controller.toggleBoundingBox();
+			break;
+		case IDC_BTN_VERTICES:
+			controller.toggleVertices();
+			break;
+        }
         // Handle property edit box changes
         if (HIWORD(wParam) == EN_KILLFOCUS) {
             HWND hList = GetDlgItem(hDlg, IDC_OBJECT_LIST);

@@ -22,6 +22,8 @@ public:
 	GLfloat centerX, centerY, centerZ; // Center of the mesh
 	GLfloat sizeX, sizeY, sizeZ; // Size of the mesh in each dimension
 	GLfloat rotationX, rotationY, rotationZ; // Rotation angles in degrees
+    bool showBoundingBox = false;
+    bool showVertices = false;
 
     // Constructor
     Mesh() {}
@@ -135,6 +137,14 @@ public:
         }
         glDisableClientState(GL_VERTEX_ARRAY);
         glDisableClientState(GL_COLOR_ARRAY);
+
+        if (showBoundingBox) {
+            drawBoundingBox();
+        }
+
+        if (showVertices) {
+            drawVertices();
+        }
 
     }
 
@@ -299,9 +309,56 @@ public:
         }
     }
 
-    Mesh* performObjectPicking(int mouseX, int mouseY) {
-		// Check if the mouse coordinates intersect with the mesh's bounding box
-		// If it does, return this mesh; otherwise, return nullptr
-        return nullptr;
+    // Draws points at each vertex of the mesh
+    void drawVertices() const {
+        if (transformedVertices.empty()) return;
+
+        glPointSize(5.0f);
+        glBegin(GL_POINTS);
+        glColor3f(0.0f, 0.0f, 0.0f); 
+
+        for (size_t i = 0; i < transformedVertices.size(); i += 3) {
+            glVertex3f(transformedVertices[i], transformedVertices[i + 1], transformedVertices[i + 2]);
+        }
+
+        glEnd();
     }
+
+    // Draws a wireframe bounding box around the mesh
+    void drawBoundingBox() const {
+        if (transformedVertices.empty()) return;
+
+        glColor3f(1.0f, 1.0f, 0.0f); 
+        glBegin(GL_LINES);
+
+        // Bottom face
+        glVertex3f(minX, minY, minZ); glVertex3f(maxX, minY, minZ);
+        glVertex3f(maxX, minY, minZ); glVertex3f(maxX, minY, maxZ);
+        glVertex3f(maxX, minY, maxZ); glVertex3f(minX, minY, maxZ);
+        glVertex3f(minX, minY, maxZ); glVertex3f(minX, minY, minZ);
+
+        // Top face
+        glVertex3f(minX, maxY, minZ); glVertex3f(maxX, maxY, minZ);
+        glVertex3f(maxX, maxY, minZ); glVertex3f(maxX, maxY, maxZ);
+        glVertex3f(maxX, maxY, maxZ); glVertex3f(minX, maxY, maxZ);
+        glVertex3f(minX, maxY, maxZ); glVertex3f(minX, maxY, minZ);
+
+        // Vertical lines
+        glVertex3f(minX, minY, minZ); glVertex3f(minX, maxY, minZ);
+        glVertex3f(maxX, minY, minZ); glVertex3f(maxX, maxY, minZ);
+        glVertex3f(maxX, minY, maxZ); glVertex3f(maxX, maxY, maxZ);
+        glVertex3f(minX, minY, maxZ); glVertex3f(minX, maxY, maxZ);
+
+        glEnd();
+    }
+
+    void toggleBoundingBox() {
+        showBoundingBox = !showBoundingBox;
+    }
+
+    void toggleVertices() {
+        showVertices = !showVertices;
+    }
+
+
 };

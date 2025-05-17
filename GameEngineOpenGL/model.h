@@ -157,17 +157,6 @@ public:
        meshes.push_back(mesh);
     }
 
-    void handleMouseDown(WPARAM state, int x, int y) {
-		for (auto& mesh : meshes) {
-			Mesh* pickedMesh = mesh.performObjectPicking(x, y);
-			if (pickedMesh) {
-				// Handle the picked mesh (e.g., change color, highlight, etc.)
-				MessageBox(NULL, L"Mesh picked!", L"Info", MB_OK);
-				break;
-			}
-		}
-    }
-
     void createFromFile(std::wstring filePath) {
 		Mesh mesh;
 		if (mesh.loadFromSTL(std::string(filePath.begin(), filePath.end()))) {

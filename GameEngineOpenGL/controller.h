@@ -105,7 +105,6 @@ public:
 	void handleMouseDown(WPARAM state, float x, float y) {
 		mouseX = x;
 		mouseY = y;
-		model->handleMouseDown(state, x, y);
 	}
 
 	void createDialogHandle(wchar_t* objectType, int x, int y, int z, int size) {
@@ -171,6 +170,36 @@ public:
 			std::wstringstream ss;
 			ss << L"Object " << (i + 1);
 			SendMessage(hList, LB_ADDSTRING, 0, (LPARAM)ss.str().c_str());
+		}
+	}
+
+	Mesh* getSelectedMesh() {
+		HWND hList = GetDlgItem(sidebarHandle, IDC_OBJECT_LIST);
+		if (!hList) return nullptr;
+		int sel = (int)SendMessage(hList, LB_GETCURSEL, 0, 0);
+		if (sel >= 0 && sel < (int)model->meshes.size()) {
+			return &model->meshes[sel];
+		}
+		return nullptr;
+	}
+
+	void toggleBoundingBox() {
+		Mesh* selectedMesh = getSelectedMesh();
+		if (selectedMesh) {
+			selectedMesh->toggleBoundingBox();
+		}
+		else {
+			MessageBox(parentHandle, L"No object selected", L"Error", MB_OK);
+		}
+	}
+
+	void toggleVertices() {
+		Mesh* selectedMesh = getSelectedMesh();
+		if (selectedMesh) {
+			selectedMesh->toggleVertices();
+		}
+		else {
+			MessageBox(parentHandle, L"No object selected", L"Error", MB_OK);
 		}
 	}
 
