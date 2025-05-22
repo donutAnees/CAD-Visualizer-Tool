@@ -275,12 +275,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 LRESULT CALLBACK ChildWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
+    case WM_LBUTTONDOWN: {
+        controller.handleMouseDown(wParam, LOWORD(lParam), HIWORD(lParam));
+        SetFocus(GetParent(hWnd)); // Give focus to the parent window
+    }
+        break;
     case WM_MOUSEMOVE:
         controller.handleMouseInput(wParam, LOWORD(lParam), HIWORD(lParam));
         break;
-	case WM_LBUTTONDOWN:
-		controller.handleMouseDown(wParam, LOWORD(lParam), HIWORD(lParam));
-		break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
