@@ -20,8 +20,8 @@ public:
 	int mouseY;
 
 	Controller(Model* model, View* view) : model(model), view(view), mouseX(0), mouseY(0),
-										   handle(NULL), parentHandle(NULL), sidebarHandle(NULL){
-
+										   handle(NULL), parentHandle(NULL), sidebarHandle(NULL),
+										   loopThreadFlag(false){
 	}
 
 	~Controller() {

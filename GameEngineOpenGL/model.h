@@ -8,18 +8,21 @@
 #include <sstream>
 #include <vector>
 #include "Mesh.h"
+#include "grid.h"
 
 class Model {
 public:
 	Camera camera;
 	std::vector<Mesh> meshes;
-	Model() : camera() {
+	Grid grid;
+
+	Model() : camera(), grid(camera) {
 	}
 	void init() {
 		// To enable depth testing, which can be used to determine which objects, or parts of objects, are visible
 		glEnable(GL_DEPTH_TEST);
 		// Clear the color and depth buffer
-		glClearColor(0.1f, 0.1f, 0.3f, 1.0f);
+		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 
@@ -58,6 +61,9 @@ public:
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
 		glLoadMatrixf(glm::value_ptr(camera.getViewMatrix()));
+
+		// Draw the plane grid
+        grid.drawXZGrid();
 
 		// Draw the meshes
 		for (const auto& mesh : meshes) {

@@ -6,6 +6,7 @@
 #include <GL/glu.h>
 #include <sstream>
 #include <iostream>
+#include "grid.h"
 
 
 // View is responsible for rendering the visual content to the screen
