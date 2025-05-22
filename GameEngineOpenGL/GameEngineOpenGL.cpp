@@ -424,10 +424,6 @@ INT_PTR CALLBACK SidebarDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARA
 
                 // Update the mesh geometry
                 mesh.updateMesh();
-
-				// Recalculate the bounding box
-				mesh.calculateBounds();
-
             }
         }
         break;

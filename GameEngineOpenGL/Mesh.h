@@ -24,6 +24,8 @@ public:
 	GLfloat rotationX, rotationY, rotationZ; // Rotation angles in degrees
     bool showBoundingBox = false;
     bool showVertices = false;
+	// Model Matrix to apply transformations
+	glm::mat4 modelMatrix = glm::mat4(1.0f); 
 
     // Constructor
     Mesh() {}
@@ -290,7 +292,7 @@ public:
         // Combine rotations
         glm::mat4 rotationMatrix = rotZ * rotY * rotX;
 
-        glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(centerX, centerY, centerZ)) *
+        modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(centerX, centerY, centerZ)) *
                                 rotationMatrix *
 			// Rotation must happen around the center of the object
 			// Since the object is centered at X,Y,Z, we first convert it to 0,0,0
@@ -328,26 +330,73 @@ public:
     void drawBoundingBox() const {
         if (transformedVertices.empty()) return;
 
-        glColor3f(1.0f, 1.0f, 0.0f); 
+        // Define the 8 corners of the bounding box
+        glm::vec4 corners[8] = {
+            {minX, minY, minZ, 1.0f}, {maxX, minY, minZ, 1.0f},
+            {maxX, minY, maxZ, 1.0f}, {minX, minY, maxZ, 1.0f},
+            {minX, maxY, minZ, 1.0f}, {maxX, maxY, minZ, 1.0f},
+            {maxX, maxY, maxZ, 1.0f}, {minX, maxY, maxZ, 1.0f}
+        };
+
+        // Create the same transformation matrix used for the object
+        float rx = glm::radians(rotationX);
+        float ry = glm::radians(rotationY);
+        float rz = glm::radians(rotationZ);
+
+        glm::mat4 rotX = glm::rotate(glm::mat4(1.0f), rx, glm::vec3(1.0f, 0.0f, 0.0f));
+        glm::mat4 rotY = glm::rotate(glm::mat4(1.0f), ry, glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 rotZ = glm::rotate(glm::mat4(1.0f), rz, glm::vec3(0.0f, 0.0f, 1.0f));
+
+        glm::mat4 rotationMatrix = rotZ * rotY * rotX;
+
+        // Transform the corners
+        glm::vec4 transformedCorners[8];
+        for (int i = 0; i < 8; ++i) {
+            transformedCorners[i] = modelMatrix * corners[i];
+        }
+
+        // Draw the bounding box using the transformed corners
+        glColor3f(1.0f, 1.0f, 0.0f); // Yellow color
         glBegin(GL_LINES);
 
         // Bottom face
-        glVertex3f(minX, minY, minZ); glVertex3f(maxX, minY, minZ);
-        glVertex3f(maxX, minY, minZ); glVertex3f(maxX, minY, maxZ);
-        glVertex3f(maxX, minY, maxZ); glVertex3f(minX, minY, maxZ);
-        glVertex3f(minX, minY, maxZ); glVertex3f(minX, minY, minZ);
+        glVertex3f(transformedCorners[0].x, transformedCorners[0].y, transformedCorners[0].z);
+        glVertex3f(transformedCorners[1].x, transformedCorners[1].y, transformedCorners[1].z);
+
+        glVertex3f(transformedCorners[1].x, transformedCorners[1].y, transformedCorners[1].z);
+        glVertex3f(transformedCorners[2].x, transformedCorners[2].y, transformedCorners[2].z);
+
+        glVertex3f(transformedCorners[2].x, transformedCorners[2].y, transformedCorners[2].z);
+        glVertex3f(transformedCorners[3].x, transformedCorners[3].y, transformedCorners[3].z);
+
+        glVertex3f(transformedCorners[3].x, transformedCorners[3].y, transformedCorners[3].z);
+        glVertex3f(transformedCorners[0].x, transformedCorners[0].y, transformedCorners[0].z);
 
         // Top face
-        glVertex3f(minX, maxY, minZ); glVertex3f(maxX, maxY, minZ);
-        glVertex3f(maxX, maxY, minZ); glVertex3f(maxX, maxY, maxZ);
-        glVertex3f(maxX, maxY, maxZ); glVertex3f(minX, maxY, maxZ);
-        glVertex3f(minX, maxY, maxZ); glVertex3f(minX, maxY, minZ);
+        glVertex3f(transformedCorners[4].x, transformedCorners[4].y, transformedCorners[4].z);
+        glVertex3f(transformedCorners[5].x, transformedCorners[5].y, transformedCorners[5].z);
+
+        glVertex3f(transformedCorners[5].x, transformedCorners[5].y, transformedCorners[5].z);
+        glVertex3f(transformedCorners[6].x, transformedCorners[6].y, transformedCorners[6].z);
+
+        glVertex3f(transformedCorners[6].x, transformedCorners[6].y, transformedCorners[6].z);
+        glVertex3f(transformedCorners[7].x, transformedCorners[7].y, transformedCorners[7].z);
+
+        glVertex3f(transformedCorners[7].x, transformedCorners[7].y, transformedCorners[7].z);
+        glVertex3f(transformedCorners[4].x, transformedCorners[4].y, transformedCorners[4].z);
 
         // Vertical lines
-        glVertex3f(minX, minY, minZ); glVertex3f(minX, maxY, minZ);
-        glVertex3f(maxX, minY, minZ); glVertex3f(maxX, maxY, minZ);
-        glVertex3f(maxX, minY, maxZ); glVertex3f(maxX, maxY, maxZ);
-        glVertex3f(minX, minY, maxZ); glVertex3f(minX, maxY, maxZ);
+        glVertex3f(transformedCorners[0].x, transformedCorners[0].y, transformedCorners[0].z);
+        glVertex3f(transformedCorners[4].x, transformedCorners[4].y, transformedCorners[4].z);
+
+        glVertex3f(transformedCorners[1].x, transformedCorners[1].y, transformedCorners[1].z);
+        glVertex3f(transformedCorners[5].x, transformedCorners[5].y, transformedCorners[5].z);
+
+        glVertex3f(transformedCorners[2].x, transformedCorners[2].y, transformedCorners[2].z);
+        glVertex3f(transformedCorners[6].x, transformedCorners[6].y, transformedCorners[6].z);
+
+        glVertex3f(transformedCorners[3].x, transformedCorners[3].y, transformedCorners[3].z);
+        glVertex3f(transformedCorners[7].x, transformedCorners[7].y, transformedCorners[7].z);
 
         glEnd();
     }
