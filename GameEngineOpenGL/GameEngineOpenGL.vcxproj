@@ -135,6 +135,7 @@
     <ClInclude Include="controller.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GameEngineOpenGL.h" />
+    <ClInclude Include="grid.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="model.h" />
     <ClInclude Include="Resource.h" />

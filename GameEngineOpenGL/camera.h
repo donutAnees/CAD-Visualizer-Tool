@@ -39,8 +39,8 @@ public:
 	glm::mat4 viewMatrix;
 
     Camera(){
-        position = glm::vec3(0.0f, 0.0f, -5.0f);
-        angle = glm::vec3(0.0f, 90.0f, 0.0f);
+        position = glm::vec3(0.0f, 10.0f, -10.0f);
+        angle = glm::vec3(-45.0f, 90.0f, 0.0f);
 		moveSpeed = 10.0f;
 		mouseSensitivity = 0.1f;
         zoom = FOV;

@@ -54,6 +54,9 @@
     <ClInclude Include="controller.h">
       <Filter>Header Files\controller</Filter>
     </ClInclude>
+    <ClInclude Include="grid.h">
+      <Filter>Header Files\model</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GameEngineOpenGL.cpp">
