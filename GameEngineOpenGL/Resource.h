@@ -37,7 +37,7 @@
 #define IDC_STATIC                      -1
 #define IDC_BTN_BOUNDINGBOX  2201
 #define IDC_BTN_VERTICES    2202
-#define IDC_BTN_LIGHTING     2203
+#define IDC_BTN_ORBIT_ENABLE    2203
 
 // Next default values for new objects
 // 
