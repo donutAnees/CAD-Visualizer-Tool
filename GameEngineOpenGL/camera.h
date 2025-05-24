@@ -17,7 +17,6 @@ enum Camera_Movement {
 constexpr unsigned int PERSPECTIVE_MODE = 0;
 constexpr unsigned int ORTHOGRAPHIC_MODE = 1;
 
-
 constexpr float FOV = 45.0f;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
@@ -38,15 +37,24 @@ public:
 	// View Matrix
 	glm::mat4 viewMatrix;
 
+	// Orbit camera parameters
+	bool orbitMode;
+	glm::vec3 orbitTarget;
+	float orbitDistance;
+
     Camera(){
         position = glm::vec3(0.0f, 10.0f, -10.0f);
         angle = glm::vec3(-45.0f, 90.0f, 0.0f);
 		moveSpeed = 10.0f;
 		mouseSensitivity = 0.1f;
-        zoom = FOV;
         nearPlane = NEAR_PLANE;
         farPlane = FAR_PLANE;
 		mode = PERSPECTIVE_MODE;
+		orbitMode = false;
+		orbitTarget = glm::vec3(0.0f, 0.0f, 0.0f);
+		orbitDistance = 10.0f;
+		zoom = FOV;
+		// Initialize the view matrix
 		updateViewMatrix();
     }
 
@@ -70,10 +78,6 @@ public:
 		angle.z = roll;
 	}
 
-	void setCameraZoom(float zoom) {
-		this->zoom = zoom;
-	}
-
 	void setCameraNearPlane(float nearPlane) {
 		this->nearPlane = nearPlane;
 	}
@@ -94,6 +98,45 @@ public:
 		this->mode = mode;
 	}
 
+	void setOrbitMode(bool enabled, const glm::vec3& target = glm::vec3(0.0f, 0.0f, 0.0f), float distance = 10.0f) {
+		if (enabled == orbitMode) return; 
+		// When in orbit mode, the camera looks at the orbit target
+		// but in free flow, it doesn't have any target to look at
+		// therefore switching has to be done in a way that, we consider
+		// the target of orbit camera when switching to free camera mode
+
+		if (enabled) {
+			// Switching to orbit mode
+			orbitMode = true;
+			orbitTarget = target;
+
+			glm::vec3 offset = position - orbitTarget;
+			orbitDistance = glm::length(offset);
+
+			if (orbitDistance > 0.0001f) {
+				angle.x = glm::degrees(asin(offset.y / orbitDistance)); // pitch
+				angle.y = glm::degrees(atan2(offset.z, offset.x));      // yaw
+			}
+
+			updateOrbitCameraViewMatrix();
+		}
+		else {
+			// Switching to free camera
+			orbitMode = false;
+
+			// Set angle so free camera looks toward orbitTarget (same as in orbit)
+			glm::vec3 direction = glm::normalize(orbitTarget - position);
+			angle.x = glm::degrees(asin(direction.y));                     // pitch
+			angle.y = glm::degrees(atan2(direction.z, direction.x));       // yaw
+
+			updateFreeCameraViewMatrix();
+		}
+	}
+
+	bool isOrbitMode() {
+		return orbitMode;
+	}
+
 	// Rotate the camera using delta x and y (in degrees), affects pitch and yaw
 	void rotateBy(float dx, float dy) {
 		angle.x += dy * mouseSensitivity; // pitch (around X)
@@ -104,37 +147,55 @@ public:
 		if (angle.x < -89.0f) angle.x = -89.0f;
 
 		// Update the view matrix after rotation
-		updateViewMatrix();
+		if (orbitMode) {
+			updateOrbitCameraViewMatrix();
+		}
+		else {
+			updateViewMatrix();
+		}
 	}
 
 	void move(Camera_Movement direction, float deltaTime) {
-		glm::vec3 front;
-		front.x = cos(glm::radians(angle.y)) * cos(glm::radians(angle.x));
-		front.y = sin(glm::radians(angle.x));
-		front.z = sin(glm::radians(angle.y)) * cos(glm::radians(angle.x));
-		front = glm::normalize(front);
+		if (orbitMode) {
+			// In orbit mode, we don't move the camera directly, but rather adjust the orbit distance
+			if (direction == FORWARD) {
+				orbitDistance -= moveSpeed * deltaTime;
+			}
+			else if (direction == BACKWARD) {
+				orbitDistance += moveSpeed * deltaTime;
+			}
+			updateOrbitCameraViewMatrix();
+			return;
+		}
+		else {
+			glm::vec3 front;
+			front.x = cos(glm::radians(angle.y)) * cos(glm::radians(angle.x));
+			front.y = sin(glm::radians(angle.x));
+			front.z = sin(glm::radians(angle.y)) * cos(glm::radians(angle.x));
+			front = glm::normalize(front);
 
-		glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
-		glm::vec3 right = glm::normalize(glm::cross(front, worldUp));
-		glm::vec3 up = glm::normalize(glm::cross(right, front));
+			glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+			glm::vec3 right = glm::normalize(glm::cross(front, worldUp));
+			glm::vec3 up = glm::normalize(glm::cross(right, front));
 
-		float velocity = moveSpeed * deltaTime;
+			float velocity = moveSpeed * deltaTime;
 
-		if (direction == FORWARD)
-			position += front * velocity;
-		if (direction == BACKWARD)
-			position -= front * velocity;
-		if (direction == LEFT)
-			position -= right * velocity;
-		if (direction == RIGHT)
-			position += right * velocity;
-		if (direction == UP)
-			position += up * velocity;
-		if (direction == DOWN)
-			position -= up * velocity;
+			if (direction == FORWARD)
+				position += front * velocity;
+			if (direction == BACKWARD)
+				position -= front * velocity;
+			if (direction == LEFT)
+				position -= right * velocity;
+			if (direction == RIGHT)
+				position += right * velocity;
+			if (direction == UP)
+				position += up * velocity;
+			if (direction == DOWN)
+				position -= up * velocity;
 
-		// Update the view matrix after moving
-		updateViewMatrix();
+			// Update the view matrix after moving
+			updateViewMatrix();
+		}
 	}
 
 	glm::mat4 getViewMatrix() {
@@ -143,6 +204,15 @@ public:
 
 	// We are using a free look camera, therefore Euler angles are used to calculate the camera direction
 	void updateViewMatrix() {
+		if (orbitMode) {
+			updateOrbitCameraViewMatrix();
+		}
+		else {
+			updateFreeCameraViewMatrix();
+		}
+	}
+
+	void updateFreeCameraViewMatrix() {
 		glm::vec3 front;
 		front.x = cos(glm::radians(angle.y)) * cos(glm::radians(angle.x));
 		front.y = sin(glm::radians(angle.x));
@@ -156,4 +226,15 @@ public:
 		viewMatrix = glm::lookAt(position, position + front, up);
 	}
 
+	void updateOrbitCameraViewMatrix() {
+        float yaw = glm::radians(angle.y);
+        float pitch = glm::radians(angle.x);
+
+        position.x = orbitTarget.x + orbitDistance * cos(pitch) * cos(yaw);
+        position.y = orbitTarget.y + orbitDistance * sin(pitch);
+        position.z = orbitTarget.z + orbitDistance * cos(pitch) * sin(yaw);
+
+        glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+        viewMatrix = glm::lookAt(position, orbitTarget, up);
+    }
  };

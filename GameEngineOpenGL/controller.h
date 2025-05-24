@@ -178,9 +178,24 @@ public:
 		if (!hList) return nullptr;
 		int sel = (int)SendMessage(hList, LB_GETCURSEL, 0, 0);
 		if (sel >= 0 && sel < (int)model->meshes.size()) {
-			return &model->meshes[sel];
+			return &model->meshes[sel]; 
 		}
 		return nullptr;
+	}
+
+	void toggleOrbitAroundObject() {
+		Mesh* selectedMesh = getSelectedMesh();
+		if (selectedMesh) {
+			if (model->camera.isOrbitMode()) {
+				model->camera.setOrbitMode(false);
+			}
+			else {
+				model->camera.setOrbitMode(true, selectedMesh->getCenter(), 10.0f);
+			}
+		}
+		else {
+			MessageBox(parentHandle, L"No object selected", L"Error", MB_OK);
+		}
 	}
 
 	void toggleBoundingBox() {

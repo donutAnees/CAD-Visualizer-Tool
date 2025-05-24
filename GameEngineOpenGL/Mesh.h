@@ -7,6 +7,7 @@
 #include <fstream>
 #include <string>
 #include <cstring>
+#include <iostream>
 #include <glm/glm.hpp>
 
 class Mesh {
@@ -115,6 +116,10 @@ public:
 	void setIndices(const std::vector<unsigned int>& indices) {
 		this->indices = indices;
 	}
+    
+    glm::vec3 getCenter() {
+		return glm::vec3(centerX, centerY, centerZ);
+    }
 
     // Render the mesh
     void draw() const {

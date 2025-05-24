@@ -397,6 +397,9 @@ INT_PTR CALLBACK SidebarDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARA
 		case IDC_BTN_VERTICES:
 			controller.toggleVertices();
 			break;
+        case IDC_BTN_ORBIT_ENABLE:
+		    controller.toggleOrbitAroundObject();
+		break;        
         }
         // Handle property edit box changes
         if (HIWORD(wParam) == EN_KILLFOCUS) {
