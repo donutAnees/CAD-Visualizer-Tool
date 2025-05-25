@@ -237,4 +237,32 @@ public:
         glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
         viewMatrix = glm::lookAt(position, orbitTarget, up);
     }
+
+	void zoomToBoundingBox(glm::vec3 center, glm::vec3 size, float aspectRatio) {
+		float radius = glm::length(size) * 0.5f;
+
+		float fovY = glm::radians(zoom);
+		float fovX = 2.0f * atanf(tanf(fovY / 2.0f) * aspectRatio);
+
+		float distanceY = radius / tan(fovY / 2.0f);
+		float distanceX = radius / tan(fovX / 2.0f);
+		float distance = std::max(distanceY, distanceX);
+
+		// Place the camera at the required distance from the center, looking at the center
+		if (orbitMode) {
+			orbitTarget = center;
+			orbitDistance = distance;
+			updateOrbitCameraViewMatrix();
+		}
+		else {
+			// Move the camera along its current forward direction, but so it looks at the center
+			glm::vec3 front;
+			front.x = cos(glm::radians(angle.y)) * cos(glm::radians(angle.x));
+			front.y = sin(glm::radians(angle.x));
+			front.z = sin(glm::radians(angle.y)) * cos(glm::radians(angle.x));
+			front = glm::normalize(front);
+			position = center - front * distance;
+			updateFreeCameraViewMatrix();
+		}
+	}
  };

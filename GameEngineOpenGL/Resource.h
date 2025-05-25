@@ -38,6 +38,7 @@
 #define IDC_BTN_BOUNDINGBOX  2201
 #define IDC_BTN_VERTICES    2202
 #define IDC_BTN_ORBIT_ENABLE    2203
+#define IDC_BTN_FIT_TO_FOCUS_OBJECT 2204
 
 // Next default values for new objects
 // 
