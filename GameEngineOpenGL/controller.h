@@ -20,16 +20,16 @@ public:
 	int mouseY;
 
 	Controller(Model* model, View* view) : model(model), view(view), mouseX(0), mouseY(0),
-										   handle(NULL), parentHandle(NULL), sidebarHandle(NULL),
-										   loopThreadFlag(false){
+		handle(NULL), parentHandle(NULL), sidebarHandle(NULL),
+		loopThreadFlag(false) {
 	}
 
 	~Controller() {
-        loopThreadFlag = false; // Signal the thread to stop
-        if (thread.joinable())
-        {
+		loopThreadFlag = false; // Signal the thread to stop
+		if (thread.joinable())
+		{
 			thread.join(); // Wait for the thread to finish
-        }
+		}
 	}
 
 	int create(HWND handle, HWND parentHandle, HWND sidebarHandle) {
@@ -50,14 +50,14 @@ public:
 	void runThread() {
 		wglMakeCurrent(view->getHdc(), view->getHglrc());
 		model->init();
-		RECT rect;    
+		RECT rect;
 		while (loopThreadFlag) {
-		GetClientRect(handle, &rect);
-		int width = rect.right - rect.left;
-		int height = rect.bottom - rect.top;
-		view->setWindowSize(width, height);
-		view->render();
-		view->swapBuffer();
+			GetClientRect(handle, &rect);
+			int width = rect.right - rect.left;
+			int height = rect.bottom - rect.top;
+			view->setWindowSize(width, height);
+			view->render();
+			view->swapBuffer();
 		}
 		view->closeContext(handle);
 		wglMakeCurrent(NULL, NULL);
@@ -82,13 +82,13 @@ public:
 			model->camera.move(RIGHT, 0.01f);
 			break;
 		case VK_ESCAPE:
-			loopThreadFlag = false; 
+			loopThreadFlag = false;
 			break;
 		default:
 			break;
 		}
 	}
-	
+
 	// Handles camera rotation based on mouse movement
 	void handleMouseInput(WPARAM state, float x, float y) {
 		if (state == MK_LBUTTON)
@@ -100,7 +100,7 @@ public:
 			mouseY = y;
 		}
 	}
-	
+
 	// Handles mouse button down events, for object selection or other actions
 	void handleMouseDown(WPARAM state, float x, float y) {
 		mouseX = x;
@@ -110,7 +110,7 @@ public:
 	void createDialogHandle(wchar_t* objectType, int x, int y, int z, int size) {
 		if (wcscmp(objectType, L"Cube") == 0)
 		{
-			model->createCube(x,y,z,size);
+			model->createCube(x, y, z, size);
 			updateSidebar();
 		}
 		else if (wcscmp(objectType, L"Pyramid") == 0)
@@ -178,7 +178,7 @@ public:
 		if (!hList) return nullptr;
 		int sel = (int)SendMessage(hList, LB_GETCURSEL, 0, 0);
 		if (sel >= 0 && sel < (int)model->meshes.size()) {
-			return &model->meshes[sel]; 
+			return &model->meshes[sel];
 		}
 		return nullptr;
 	}
@@ -218,4 +218,13 @@ public:
 		}
 	}
 
+	void fitOjbectToView() {
+		Mesh* selectedMesh = getSelectedMesh();
+		if (selectedMesh) {
+			model->camera.zoomToBoundingBox(selectedMesh->getCenter(), selectedMesh->getSize(), view->getAspectRatio());
+		}
+		else {
+			MessageBox(parentHandle, L"No object selected", L"Error", MB_OK);
+		}
+	}
 };

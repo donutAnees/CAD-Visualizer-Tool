@@ -134,6 +134,10 @@ public:
 		return glm::vec3(centerX, centerY, centerZ);
     }
 
+    glm::vec3 getSize() {
+        return glm::vec3(sizeX, sizeY, sizeZ);
+    }
+
     // Render the mesh
     void draw() const {
         glEnableClientState(GL_VERTEX_ARRAY);

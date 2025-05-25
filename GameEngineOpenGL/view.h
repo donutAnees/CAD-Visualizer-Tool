@@ -30,6 +30,10 @@ public:
 		glViewport((GLint)x,(GLint) y, (GLsizei)width, (GLsizei)height);
 	}
 
+	float getAspectRatio() {
+		return  (float)this->screenWidth / (float)this->screenHeight;
+	}
+
 	// Function to set the device context and rendering context
 	int setContext(HWND hWnd) {
 		this->hdc = GetDC(hWnd);

@@ -399,6 +399,10 @@ INT_PTR CALLBACK SidebarDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARA
 			break;
         case IDC_BTN_ORBIT_ENABLE:
 		    controller.toggleOrbitAroundObject();
+            break;
+        case IDC_BTN_FIT_TO_FOCUS_OBJECT:
+            controller.fitOjbectToView();
+            break;
 		break;        
         }
         // Handle property edit box changes
