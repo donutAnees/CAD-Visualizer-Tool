@@ -198,6 +198,16 @@ public:
 		}
 	}
 
+	void deleteSelectedObject() {
+		HWND hList = GetDlgItem(sidebarHandle, IDC_OBJECT_LIST);
+		if (!hList) return;
+		int sel = (int)SendMessage(hList, LB_GETCURSEL, 0, 0);
+		if (sel >= 0 && sel < (int)model->meshes.size()) {
+			model->meshes.erase(model->meshes.begin() + sel);
+			updateSidebar();
+		}
+	}
+
 	void toggleBoundingBox() {
 		Mesh* selectedMesh = getSelectedMesh();
 		if (selectedMesh) {

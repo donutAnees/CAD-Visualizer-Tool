@@ -403,6 +403,9 @@ INT_PTR CALLBACK SidebarDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARA
         case IDC_BTN_FIT_TO_FOCUS_OBJECT:
             controller.fitOjbectToView();
             break;
+        case IDC_BTN_DELETE_OBJECT:
+            controller.deleteSelectedObject();
+            break;
 		break;        
         }
         // Handle property edit box changes
