@@ -1,7 +1,7 @@
 # CAD Visualizer Tool
 A CAD editor built using OpenGL and Win32.
 
-# GameEngineOpenGL – Features Overview
+# CAD Visualizer Tool – Features Overview
 
 ![Screenshot 2025-05-30 100020](https://github.com/user-attachments/assets/7d343a05-6b65-4678-aaf1-9431a372bb47)
 
