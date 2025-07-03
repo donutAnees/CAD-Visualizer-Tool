@@ -143,7 +143,9 @@
     <ClInclude Include="view.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="GameEngineOpenGL.cpp" />
+    <ClCompile Include="GameEngineOpenGL.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\dkaru\source\repos\donutAnees\CAD-Visualizer-Tool\GameEngineOpenGL\Libraries\include</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="GameEngineOpenGL.rc" />

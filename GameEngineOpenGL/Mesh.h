@@ -10,6 +10,10 @@
 #include <iostream>
 #include <glm/glm.hpp>
 
+struct Face {
+   unsigned int v0, v1, v2;
+};
+
 class Mesh {
 public:
     // Data
@@ -18,6 +22,8 @@ public:
     std::vector<GLfloat> transformedVertices; 
     std::vector<GLfloat> colors;
     std::vector<unsigned int> indices;
+    // Faces for the mesh
+	std::vector<Face> faces;
 	bool isTransparent = false; 
 	GLfloat minX, maxX, minY, maxY, minZ, maxZ; // Bounding box coordinates
     glm::vec4 transformedBoundingBoxCorners[8];
@@ -94,6 +100,16 @@ public:
         return glm::vec3((minX + maxX) / 2.0f, (minY + maxY) / 2.0f, (minZ + maxZ) / 2.0f);
     }
 
+    void constructFaces() {
+        faces.clear();
+        for (size_t i = 0; i < indices.size(); i += 3) {
+            Face face;
+            face.v0 = indices[i];
+            face.v1 = indices[i + 1];
+            face.v2 = indices[i + 2];
+            faces.push_back(face);
+        }
+	}
 
     void init(const std::vector<GLfloat>& vertices, const std::vector<GLfloat>& colors, const std::vector<unsigned int>& indices) {
 		this->vertices = vertices;
@@ -113,6 +129,9 @@ public:
 		rotationX = 0.0f;
 		rotationY = 0.0f;
 		rotationZ = 0.0f;
+
+		// Construct faces from indices
+		constructFaces();
     }
 
 	// Set vertices and colors
