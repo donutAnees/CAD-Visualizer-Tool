@@ -138,7 +138,9 @@
     <ClInclude Include="grid.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="model.h" />
+    <ClInclude Include="ray.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="spacialaccelerator.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="view.h" />
   </ItemGroup>

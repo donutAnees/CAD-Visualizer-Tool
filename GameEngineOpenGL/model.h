@@ -9,15 +9,18 @@
 #include <vector>
 #include "Mesh.h"
 #include "grid.h"
+#include "spacialaccelerator.h"
 
 class Model {
 public:
 	Camera camera;
 	std::vector<Mesh> meshes;
 	Grid grid;
+    BVH bvh;
 
 	Model() : camera(), grid(camera) {
 	}
+
 	void init() {
 		// To enable depth testing, which can be used to determine which objects, or parts of objects, are visible
 		glEnable(GL_DEPTH_TEST);
@@ -25,6 +28,10 @@ public:
 		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
+
+    void buildBVH() {
+        bvh.build(meshes);
+    }
 
 	// Behind the scene, this gets the left, right, bottom and top values using the other parameters
 	/* With respect to Horizontal FOV
@@ -124,6 +131,7 @@ public:
 
 		mesh.init(vertices, colors, indices);
         meshes.push_back(mesh);
+		bvh.build(meshes);
     }
 
 
@@ -161,12 +169,14 @@ public:
        };
        mesh.init(vertices, colors, indices);
        meshes.push_back(mesh);
+	   bvh.build(meshes);
     }
 
     void createFromFile(std::wstring filePath) {
 		Mesh mesh;
 		if (mesh.loadFromSTL(std::string(filePath.begin(), filePath.end()))) {
 			meshes.push_back(mesh);
+			bvh.build(meshes);
 			MessageBox(NULL, L"File loaded successfully!", L"Info", MB_OK);
 		} 
 		else {

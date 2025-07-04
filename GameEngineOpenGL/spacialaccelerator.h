@@ -2,7 +2,10 @@
 
 #include <vector>
 #include <glm/glm.hpp>
+#include <limits>
+#include <algorithm>
 #include "mesh.h"
+#include "ray.h"
 
 /*
 * Bounding Volume Hierarchy (BVH) is a tree structure on a set of geometric objects.
@@ -79,8 +82,46 @@ private:
 	}
 
 	// Returns the index of the axis to split on
-	int splitNode(BVHNode* node, unsigned int start, unsigned int end, int depth = BVH_MAX_DEPTH){
-	
+	int splitNode(BVHNode* node, unsigned int start, unsigned int end, int depth = BVH_MAX_DEPTH) {
+		unsigned int N = end - start;
+		if (N <= 1) return -1;
+
+		int bestAxis = -1;
+		int bestSplit = -1;
+		float bestCost = std::numeric_limits<float>::max();
+
+		// Try all 3 axes (0: x, 1: y, 2: z)
+		for (int axis = 0; axis < 3; ++axis) {
+			// Sort triangles in-place by centroid along this axis
+			std::sort(triangles.begin() + start, triangles.begin() + end,
+				[axis](const Face* a, const Face* b) {
+					return a->centroid[axis] < b->centroid[axis];
+				});
+
+			// Precompute left and right surface areas using the existing function
+			std::vector<float> leftSurfaceArea, rightSurfaceArea;
+			computeSurfaceArea(start, end, leftSurfaceArea, rightSurfaceArea);
+
+			// Evaluate SAH cost for all possible splits
+			for (unsigned int i = 1; i < N; ++i) {
+				float cost = leftSurfaceArea[i] * i + rightSurfaceArea[i] * (N - i);
+				if (cost < bestCost) {
+					bestCost = cost;
+					bestAxis = axis;
+					bestSplit = i;
+				}
+			}
+		}
+
+		if (bestSplit <= 0 || bestSplit >= (int)N) return -1;
+
+		// Resort triangles along the best axis for the actual split
+		std::sort(triangles.begin() + start, triangles.begin() + end,
+			[bestAxis](const Face* a, const Face* b) {
+				return a->centroid[bestAxis] < b->centroid[bestAxis];
+			});
+
+		return start + bestSplit;
 	}
 
 	void computeSurfaceArea(unsigned int start, unsigned int end, std::vector<float>& leftSurfaceArea, std::vector<float>& rightSurfaceArea) {
@@ -91,11 +132,11 @@ private:
 		rightSurfaceArea[size - 1] = 0.0f;
 		AABB leftBox, rightBox;
 		for (int i = 1; i < size; ++i) {
-			leftBox.merge(allFaces[start + i - 1]->boundingBox);
+			leftBox.merge(triangles[start + i - 1]->boundingBox);
 			leftSurfaceArea[i] = leftBox.getSurfaceArea();
 		}
 		for (int i = size - 2; i >= 0; --i) {
-			rightBox.merge(allFaces[start + i + 1]->boundingBox);
+			rightBox.merge(triangles[start + i + 1]->boundingBox);
 			rightSurfaceArea[i] = rightBox.getSurfaceArea();
 		}
 	}
@@ -122,14 +163,14 @@ public:
 	}
 
 	void build(const std::vector<Mesh>& meshes) {
-		allFaces.clear();
+		triangles.clear();
 		for (const auto& mesh : meshes) {
 			for (const auto& face : mesh.faces) {
-				allFaces.push_back(const_cast<Face*>(&face));
+				triangles.push_back(const_cast<Face*>(&face));
 			}
 		}
 		if (root) delete root;
-		root = new BVHNode(0, static_cast<unsigned int>(allFaces.size()));
+		root = new BVHNode(0, static_cast<unsigned int>(triangles.size()));
 		buildBVH(root, BVH_MAX_DEPTH);
 	}
 
