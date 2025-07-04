@@ -10,18 +10,63 @@
 #include <iostream>
 #include <glm/glm.hpp>
 
-struct Face {
+class AABB {
+public:
+    glm::vec3 min; // Minimum coordinates
+    glm::vec3 max; // Maximum coordinates
+    void merge(const AABB& other) {
+        min = glm::min(min, other.min);
+        max = glm::max(max, other.max);
+    }
+    float getSurfaceArea() const {
+        glm::vec3 extent = max - min;
+        return 2.0f * (extent.x * extent.y + extent.x * extent.z + extent.y * extent.z);
+	}
+};
+
+class Face {
+public:
    unsigned int v0, v1, v2;
+   AABB boundingBox; // Axis-Aligned Bounding Box for the face
+   glm::vec3 centroid;
+   // Constructor
+   Face(unsigned int v0 = 0, unsigned int v1 = 0, unsigned int v2 = 0,
+       const std::vector<GLfloat>* vertices = nullptr){
+       boundingBox.min = glm::vec3(FLT_MAX);
+	   boundingBox.max = glm::vec3(-FLT_MAX);
+	   boundingBox.min.x = glm::min(boundingBox.min.x, boundingBox.max.x);
+       boundingBox.min.y = glm::min(boundingBox.min.y, boundingBox.max.y);
+       boundingBox.min.z = glm::min(boundingBox.min.z, boundingBox.max.z);
+
+       // Initialize centroid if vertices are provided
+       if (vertices && vertices->size() >= 3 * (std::max({ v0, v1, v2 }) + 1)) {
+           glm::vec3 p0((*vertices)[v0 * 3], (*vertices)[v0 * 3 + 1], (*vertices)[v0 * 3 + 2]);
+           glm::vec3 p1((*vertices)[v1 * 3], (*vertices)[v1 * 3 + 1], (*vertices)[v1 * 3 + 2]);
+           glm::vec3 p2((*vertices)[v2 * 3], (*vertices)[v2 * 3 + 1], (*vertices)[v2 * 3 + 2]);
+           centroid = (p0 + p1 + p2) / 3.0f;
+       }
+       else {
+           centroid = glm::vec3(0.0f);
+       }
+   }
+   unsigned int getVertex(unsigned int index) const {
+       switch (index) {
+           case 0: return v0;
+           case 1: return v1;
+           case 2: return v2;
+           default: throw std::out_of_range("Index must be 0, 1, or 2");
+       }
+   }
 };
 
 class Mesh {
 public:
     // Data
-    std::vector<GLfloat> vertices;
+	std::vector<GLfloat> vertices; // flat vertices in 3D space (x0, y0, z0, x1, x1, z1...)
 	// Transformed vertices, so that we can apply transformations to the original vertices
     std::vector<GLfloat> transformedVertices; 
     std::vector<GLfloat> colors;
-    std::vector<unsigned int> indices;
+	std::vector<unsigned int> indices; // Which vertices form each face (triangles)
     // Faces for the mesh
 	std::vector<Face> faces;
 	bool isTransparent = false; 
@@ -103,11 +148,7 @@ public:
     void constructFaces() {
         faces.clear();
         for (size_t i = 0; i < indices.size(); i += 3) {
-            Face face;
-            face.v0 = indices[i];
-            face.v1 = indices[i + 1];
-            face.v2 = indices[i + 2];
-            faces.push_back(face);
+            Face face(indices[i], indices[i + 1], indices[i + 2], &transformedVertices);
         }
 	}
 
