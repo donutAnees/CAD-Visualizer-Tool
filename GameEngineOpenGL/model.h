@@ -1,7 +1,6 @@
 #pragma once
 
 #include "camera.h"
-#include <glm/detail/type_mat.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <GL/gl.h>
 #include <GL/glu.h>
@@ -77,6 +76,7 @@ public:
 			mesh.draw();
 			mesh.drawLocalAxis(); // Draw local axis for each mesh
 		}
+		bvh.drawBVHNode(bvh.getRoot());
 	}
 
     void createCube(int x, int y, int z, float size) {

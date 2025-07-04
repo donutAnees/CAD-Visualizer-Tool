@@ -162,16 +162,59 @@ public:
 		delete root;
 	}
 
+	BVHNode* getRoot() const {
+		return root;
+	}
+
 	void build(const std::vector<Mesh>& meshes) {
 		triangles.clear();
-		for (const auto& mesh : meshes) {
-			for (const auto& face : mesh.faces) {
+		for (const Mesh& mesh : meshes) {
+			for (const Face& face : mesh.faces) {
 				triangles.push_back(const_cast<Face*>(&face));
 			}
+		}
+		if (triangles.empty()) {
+			root = nullptr;
+			return;
 		}
 		if (root) delete root;
 		root = new BVHNode(0, static_cast<unsigned int>(triangles.size()));
 		buildBVH(root, BVH_MAX_DEPTH);
+	}
+
+	void drawBVHNode(const BVHNode* node) const {
+		if (!node) return;
+
+		// Draw the bounding box of the current node
+		const glm::vec3& min = node->boundingBox.min;
+		const glm::vec3& max = node->boundingBox.max;
+
+		glColor3f(0.0f, 1.0f, 0.0f); // Green color for bounding boxes
+		glBegin(GL_LINES);
+
+		// Bottom face
+		glVertex3f(min.x, min.y, min.z); glVertex3f(max.x, min.y, min.z);
+		glVertex3f(max.x, min.y, min.z); glVertex3f(max.x, min.y, max.z);
+		glVertex3f(max.x, min.y, max.z); glVertex3f(min.x, min.y, max.z);
+		glVertex3f(min.x, min.y, max.z); glVertex3f(min.x, min.y, min.z);
+
+		// Top face
+		glVertex3f(min.x, max.y, min.z); glVertex3f(max.x, max.y, min.z);
+		glVertex3f(max.x, max.y, min.z); glVertex3f(max.x, max.y, max.z);
+		glVertex3f(max.x, max.y, max.z); glVertex3f(min.x, max.y, max.z);
+		glVertex3f(min.x, max.y, max.z); glVertex3f(min.x, max.y, min.z);
+
+		// Vertical edges
+		glVertex3f(min.x, min.y, min.z); glVertex3f(min.x, max.y, min.z);
+		glVertex3f(max.x, min.y, min.z); glVertex3f(max.x, max.y, min.z);
+		glVertex3f(max.x, min.y, max.z); glVertex3f(max.x, max.y, max.z);
+		glVertex3f(min.x, min.y, max.z); glVertex3f(min.x, max.y, max.z);
+
+		glEnd();
+
+		// Recursively draw child nodes if they exist
+		drawBVHNode(node->left);
+		drawBVHNode(node->right);
 	}
 
 	std::vector<Face*> intersect(const Ray& ray);

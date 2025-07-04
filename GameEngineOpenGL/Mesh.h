@@ -31,24 +31,28 @@ public:
    glm::vec3 centroid;
    // Constructor
    Face(unsigned int v0 = 0, unsigned int v1 = 0, unsigned int v2 = 0,
-       const std::vector<GLfloat>* vertices = nullptr){
+       const std::vector<GLfloat>* vertices = nullptr) : v0(v0), v1(v1), v2(v2) {
        boundingBox.min = glm::vec3(FLT_MAX);
-	   boundingBox.max = glm::vec3(-FLT_MAX);
-	   boundingBox.min.x = glm::min(boundingBox.min.x, boundingBox.max.x);
-       boundingBox.min.y = glm::min(boundingBox.min.y, boundingBox.max.y);
-       boundingBox.min.z = glm::min(boundingBox.min.z, boundingBox.max.z);
+       boundingBox.max = glm::vec3(-FLT_MAX);
 
-       // Initialize centroid if vertices are provided
+       // Initialize bounding box and centroid if vertices are provided
        if (vertices && vertices->size() >= 3 * (std::max({ v0, v1, v2 }) + 1)) {
            glm::vec3 p0((*vertices)[v0 * 3], (*vertices)[v0 * 3 + 1], (*vertices)[v0 * 3 + 2]);
            glm::vec3 p1((*vertices)[v1 * 3], (*vertices)[v1 * 3 + 1], (*vertices)[v1 * 3 + 2]);
            glm::vec3 p2((*vertices)[v2 * 3], (*vertices)[v2 * 3 + 1], (*vertices)[v2 * 3 + 2]);
+
+           // Compute bounding box
+           boundingBox.min = glm::min(glm::min(p0, p1), p2);
+           boundingBox.max = glm::max(glm::max(p0, p1), p2);
+
+           // Compute centroid
            centroid = (p0 + p1 + p2) / 3.0f;
        }
        else {
            centroid = glm::vec3(0.0f);
        }
    }
+
    unsigned int getVertex(unsigned int index) const {
        switch (index) {
            case 0: return v0;
@@ -89,6 +93,7 @@ public:
 		transformedVertices.clear();
 		indices.clear();
 		colors.clear();
+		faces.clear();
     }
 
     void calculateBounds() {
@@ -148,7 +153,7 @@ public:
     void constructFaces() {
         faces.clear();
         for (size_t i = 0; i < indices.size(); i += 3) {
-            Face face(indices[i], indices[i + 1], indices[i + 2], &transformedVertices);
+            faces.emplace_back(indices[i], indices[i + 1], indices[i + 2], &transformedVertices);
         }
 	}
 
