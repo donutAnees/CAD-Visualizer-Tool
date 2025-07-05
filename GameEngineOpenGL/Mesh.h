@@ -9,6 +9,7 @@
 #include <cstring>
 #include <iostream>
 #include <glm/glm.hpp>
+#include <windows.h>
 
 class AABB {
 public:
@@ -22,45 +23,116 @@ public:
         glm::vec3 extent = max - min;
         return 2.0f * (extent.x * extent.y + extent.x * extent.z + extent.y * extent.z);
 	}
+
+    /*
+     * This method checks if a ray, defined by its origin and direction, intersects the AABB
+     * within a specified range of distances along the ray. It calculates the intersection points
+     * along each axis (x, y, z) and determines the range of distances (`tEnter` and `tExit`) where
+     * the ray is inside the box.
+     */
+    bool isIntersectingRay(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, float tMin, float tMax) const {
+		// t is the distance along the ray direction
+        float t1 = (min.x - rayOrigin.x) / rayDirection.x;
+        float t2 = (max.x - rayOrigin.x) / rayDirection.x;
+        float t3 = (min.y - rayOrigin.y) / rayDirection.y;
+        float t4 = (max.y - rayOrigin.y) / rayDirection.y;
+        float t5 = (min.z - rayOrigin.z) / rayDirection.z;
+        float t6 = (max.z - rayOrigin.z) / rayDirection.z;
+		// Find the minimum and maximum t values for each axis
+        float tMinX = std::min(t1, t2);
+        float tMaxX = std::max(t1, t2);
+        float tMinY = std::min(t3, t4);
+        float tMaxY = std::max(t3, t4);
+        float tMinZ = std::min(t5, t6);
+        float tMaxZ = std::max(t5, t6);
+		// Find the maximum of the minimum t values and the minimum of the maximum t values
+        float tEnter = std::max({tMinX, tMinY, tMinZ});
+        float tExit = std::min({tMaxX, tMaxY, tMaxZ});
+		// Check if the ray intersects the AABB within the specified t range
+        return (tEnter <= tExit && tExit >= tMin && tEnter <= tMax);
+	}
 };
 
 class Face {
 public:
-   unsigned int v0, v1, v2;
-   AABB boundingBox; // Axis-Aligned Bounding Box for the face
-   glm::vec3 centroid;
-   // Constructor
-   Face(unsigned int v0 = 0, unsigned int v1 = 0, unsigned int v2 = 0,
-       const std::vector<GLfloat>* vertices = nullptr) : v0(v0), v1(v1), v2(v2) {
-       boundingBox.min = glm::vec3(FLT_MAX);
-       boundingBox.max = glm::vec3(-FLT_MAX);
+    unsigned int v0, v1, v2;
+    AABB boundingBox; // Axis-Aligned Bounding Box for the face
+    glm::vec3 centroid;
+    std::vector<glm::vec3> vertices; // Store only the vertices this face needs
 
-       // Initialize bounding box and centroid if vertices are provided
-       if (vertices && vertices->size() >= 3 * (std::max({ v0, v1, v2 }) + 1)) {
-           glm::vec3 p0((*vertices)[v0 * 3], (*vertices)[v0 * 3 + 1], (*vertices)[v0 * 3 + 2]);
-           glm::vec3 p1((*vertices)[v1 * 3], (*vertices)[v1 * 3 + 1], (*vertices)[v1 * 3 + 2]);
-           glm::vec3 p2((*vertices)[v2 * 3], (*vertices)[v2 * 3 + 1], (*vertices)[v2 * 3 + 2]);
+    // Constructor
+    Face(unsigned int v0, unsigned int v1, unsigned int v2,
+        std::vector<GLfloat>* sourceVertices)
+        : v0(v0), v1(v1), v2(v2)
+    {
+        if (!sourceVertices || sourceVertices->size() < 3 * (std::max({ v0, v1, v2 }) + 1)) {
+            throw std::out_of_range("Face vertex index out of bounds");
+        }
 
-           // Compute bounding box
-           boundingBox.min = glm::min(glm::min(p0, p1), p2);
-           boundingBox.max = glm::max(glm::max(p0, p1), p2);
+        vertices.push_back(glm::vec3(
+            (*sourceVertices)[v0 * 3],
+            (*sourceVertices)[v0 * 3 + 1],
+            (*sourceVertices)[v0 * 3 + 2]));
 
-           // Compute centroid
-           centroid = (p0 + p1 + p2) / 3.0f;
-       }
-       else {
-           centroid = glm::vec3(0.0f);
-       }
-   }
+        vertices.push_back(glm::vec3(
+            (*sourceVertices)[v1 * 3],
+            (*sourceVertices)[v1 * 3 + 1],
+            (*sourceVertices)[v1 * 3 + 2]));
 
-   unsigned int getVertex(unsigned int index) const {
-       switch (index) {
-           case 0: return v0;
-           case 1: return v1;
-           case 2: return v2;
-           default: throw std::out_of_range("Index must be 0, 1, or 2");
-       }
-   }
+        vertices.push_back(glm::vec3(
+            (*sourceVertices)[v2 * 3],
+            (*sourceVertices)[v2 * 3 + 1],
+            (*sourceVertices)[v2 * 3 + 2]));
+
+        boundingBox.min = glm::min(glm::min(vertices[0], vertices[1]), vertices[2]);
+        boundingBox.max = glm::max(glm::max(vertices[0], vertices[1]), vertices[2]);
+        centroid = (vertices[0] + vertices[1] + vertices[2]) / 3.0f;
+    }
+
+    unsigned int getVertex(unsigned int index) const {
+        switch (index) {
+        case 0: return v0;
+        case 1: return v1;
+        case 2: return v2;
+        default: throw std::out_of_range("Index must be 0, 1, or 2");
+        }
+    }
+
+    bool isIntersectingRay(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, float tMin, float tMax) const {
+        if (vertices.size() == 3) {
+            glm::vec3 edge1 = vertices[1] - vertices[0];
+            glm::vec3 edge2 = vertices[2] - vertices[0];
+
+            // Compute determinant
+            glm::vec3 h = glm::cross(rayDirection, edge2);
+            float det = glm::dot(edge1, h);
+
+            // If determinant is near zero, ray lies in plane of triangle
+            if (det > -FLT_EPSILON && det < FLT_EPSILON) return false;
+
+            float invDet = 1.0f / det;
+
+            // Compute distance from vertices[0] to ray origin
+            glm::vec3 s = rayOrigin - vertices[0];
+
+            // Compute barycentric coordinate u
+            float u = glm::dot(s, h) * invDet;
+            if (u < 0.0f || u > 1.0f) return false;
+
+            // Compute barycentric coordinate v
+            glm::vec3 q = glm::cross(s, edge1);
+            float v = glm::dot(rayDirection, q) * invDet;
+            if (v < 0.0f || u + v > 1.0f) return false;
+
+            // Compute intersection distance t
+            float t = glm::dot(edge2, q) * invDet;
+
+            // Check if t is within the valid range
+            return t >= tMin && t <= tMax;
+        }
+        return false; // If vertices are not valid, return false
+    }
+
 };
 
 class Mesh {
@@ -158,7 +230,10 @@ public:
 	}
 
     void init(const std::vector<GLfloat>& vertices, const std::vector<GLfloat>& colors, const std::vector<unsigned int>& indices) {
-		this->vertices = vertices;
+        if (vertices.size() % 3 != 0) {
+            throw std::invalid_argument("Vertices size must be a multiple of 3 (x, y, z components).");
+        }
+        this->vertices = vertices;
 		this->transformedVertices = vertices; // Initialize transformed vertices with original vertices
 		this->colors = colors;
 		this->indices = indices;

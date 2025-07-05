@@ -33,6 +33,14 @@ public:
 	float getAspectRatio() {
 		return  (float)this->screenWidth / (float)this->screenHeight;
 	}
+	
+	int getWindowWidth() {
+		return screenWidth;
+	}
+
+	int getWindowHeight() {
+		return screenHeight;
+	}
 
 	// Function to set the device context and rendering context
 	int setContext(HWND hWnd) {

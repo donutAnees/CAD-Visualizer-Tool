@@ -133,6 +133,10 @@ public:
 		}
 	}
 
+	glm::vec3 getPosition() {
+		return position;
+	}
+
 	bool isOrbitMode() {
 		return orbitMode;
 	}

@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <limits>
 #include <algorithm>
+#include <stack>
 #include "mesh.h"
 #include "ray.h"
 
@@ -141,10 +142,6 @@ private:
 		}
 	}
 
-	void traverseBVH(BVHNode* node, const Ray& ray, std::vector<Face*>& hitFaces) {
-
-	}
-
 	AABB computeBoundingBox(unsigned int start, unsigned int end) {
 		AABB box;
 		if (start >= end) return box;
@@ -182,6 +179,28 @@ public:
 		buildBVH(root, BVH_MAX_DEPTH);
 	}
 
+	void traverse(BVHNode* node, const Ray& ray, std::vector<Face*>& hitFaces) {
+		std::stack<BVHNode*> stack;
+		stack.push(node);
+		while (!stack.empty()) {
+			BVHNode* current = stack.top();
+			stack.pop();
+			if (!current || !current->boundingBox.isIntersectingRay(ray.origin, ray.direction, ray.tMin, ray.tMax)) continue;
+			// If it's a leaf node, check for intersections with triangles
+			if (current->left == nullptr && current->right == nullptr) {
+				for (unsigned int i = current->startIndex; i < current->endIndex; ++i) {
+					if (triangles[i]->isIntersectingRay(ray.origin, ray.direction, ray.tMin, ray.tMax)) {
+						hitFaces.push_back(triangles[i]);
+					}
+				}
+				continue;
+			}
+			// Push children onto the stack
+			if (current->left) stack.push(current->left);
+			if (current->right) stack.push(current->right);
+		}
+	}
+
 	void drawBVHNode(const BVHNode* node) const {
 		if (!node) return;
 
@@ -216,6 +235,4 @@ public:
 		drawBVHNode(node->left);
 		drawBVHNode(node->right);
 	}
-
-	std::vector<Face*> intersect(const Ray& ray);
 };

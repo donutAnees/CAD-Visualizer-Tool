@@ -237,4 +237,20 @@ public:
 			MessageBox(parentHandle, L"No object selected", L"Error", MB_OK);
 		}
 	}
+
+	void testRayIntersections(float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
+		Ray ray(glm::vec3(originX, originY, originZ), glm::vec3(dirX, dirY, dirZ), 0.0f, 100.0f);
+
+		std::vector<Face*> hitFaces;
+		model->bvh.traverse(model->bvh.getRoot(), ray, hitFaces);
+
+		if (hitFaces.empty()) {
+			MessageBox(parentHandle, L"No intersections found", L"Info", MB_OK);
+		}
+		else {
+			std::wstringstream ss;
+			ss << L"Intersections found: " << hitFaces.size();
+			MessageBox(parentHandle, ss.str().c_str(), L"Info", MB_OK);
+		}
+	}
 };
