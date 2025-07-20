@@ -49,6 +49,17 @@ public:
 		glOrtho(left, right, bottom, top, nearPlane, farPlane);
 	}
 
+    glm::mat4 getProjectionMatrix(int width, int height) const {
+        if (camera.mode == PERSPECTIVE_MODE) {
+            return glm::perspective(glm::radians(camera.zoom), float(width) / float(height), camera.nearPlane, camera.farPlane);
+        }
+        else {
+            // Example orthographic, adjust as needed
+            float aspect = float(width) / float(height);
+            return glm::ortho(-aspect, aspect, -1.0f, 1.0f, camera.nearPlane, camera.farPlane);
+        }
+    }
+
 	void draw(int width, int height) {
 		// Clear the color and depth buffer
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

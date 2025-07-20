@@ -101,10 +101,41 @@ public:
 		}
 	}
 
+	void screenPointToRay(float mouseX, float mouseY, int screenWidth, int screenHeight,
+		const glm::mat4& view, const glm::mat4& projection, const Camera& camera,
+		glm::vec3& outOrigin, glm::vec3& outDir) {
+		// Convert to normalized device coordinates
+		float x = (2.0f * mouseX) / screenWidth - 1.0f;
+		float y = 1.0f - (2.0f * mouseY) / screenHeight;
+		glm::vec4 rayClip(x, y, -1.0f, 1.0f);
+
+		// Eye space
+		glm::vec4 rayEye = glm::inverse(projection) * rayClip;
+		rayEye = glm::vec4(rayEye.x, rayEye.y, -1.0f, 0.0f);
+
+		// World space
+		glm::vec3 rayWorld = glm::normalize(glm::vec3(glm::inverse(view) * rayEye));
+
+		// Camera position as ray origin
+		outOrigin = model->camera.getPosition(); 
+		outDir = rayWorld;
+	}
+	
 	// Handles mouse button down events, for object selection or other actions
 	void handleMouseDown(WPARAM state, float x, float y) {
 		mouseX = x;
 		mouseY = y;
+		// 1. Get camera matrices and window size
+		glm::mat4 viewMatrix = model->camera.getViewMatrix();
+		glm::mat4 projMatrix = model->getProjectionMatrix(view->getWindowWidth(), view->getWindowHeight());
+		int width = view->getWindowWidth();
+		int height = view->getWindowHeight();
+
+		// 2. Convert screen point to ray
+		glm::vec3 rayOrigin, rayDir;
+		screenPointToRay(x, y, width, height, viewMatrix, projMatrix, model->camera, rayOrigin, rayDir);
+
+		testRayIntersections(rayOrigin.x, rayOrigin.y, rayOrigin.z, rayDir.x, rayDir.y, rayDir.z);
 	}
 
 	void createDialogHandle(wchar_t* objectType, int x, int y, int z, int size) {
@@ -243,14 +274,28 @@ public:
 
 		std::vector<Face*> hitFaces;
 		model->bvh.traverse(model->bvh.getRoot(), ray, hitFaces);
-
-		if (hitFaces.empty()) {
-			MessageBox(parentHandle, L"No intersections found", L"Info", MB_OK);
-		}
-		else {
+		
+		if (!hitFaces.empty()) {
+			Face* firstHit = hitFaces[0];
+			int meshIndex = -1, faceIndex = -1;
+			for (size_t m = 0; m < model->meshes.size(); ++m) {
+				for (size_t f = 0; f < model->meshes[m].faces.size(); ++f) {
+					if (&model->meshes[m].faces[f] == firstHit) {
+						meshIndex = (int)m;
+						faceIndex = (int)f;
+						break;
+					}
+				}
+				if (meshIndex != -1) break;
+			}
 			std::wstringstream ss;
-			ss << L"Intersections found: " << hitFaces.size();
-			MessageBox(parentHandle, ss.str().c_str(), L"Info", MB_OK);
+			ss << L"[Picking] Intersections found: " << hitFaces.size();
+			if (meshIndex != -1) {
+				ss << L", First hit: Mesh " << meshIndex << L", Face " << faceIndex;
+			}
+			ss << L"\n";
+			OutputDebugString(ss.str().c_str());
 		}
+			
 	}
 };
