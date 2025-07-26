@@ -138,6 +138,7 @@
     <ClInclude Include="grid.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="model.h" />
+    <ClInclude Include="projectionsystem.h" />
     <ClInclude Include="ray.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="spacialaccelerator.h" />
@@ -148,6 +149,7 @@
     <ClCompile Include="GameEngineOpenGL.cpp">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\dkaru\source\repos\donutAnees\CAD-Visualizer-Tool\GameEngineOpenGL\Libraries\include</AdditionalIncludeDirectories>
     </ClCompile>
+    <ClCompile Include="projectionsystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="GameEngineOpenGL.rc" />

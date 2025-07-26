@@ -9,6 +9,8 @@
 #include "Mesh.h"
 #include "grid.h"
 #include "spacialaccelerator.h"
+#include "ProjectionSystem.h"
+#include <memory>
 
 class Model {
 public:
@@ -16,6 +18,7 @@ public:
 	std::vector<Mesh> meshes;
 	Grid grid;
     BVH bvh;
+    std::unique_ptr<ViewProjMethodGLM> projectionMethod;
 
 	Model() : camera(), grid(camera) {
 	}
@@ -32,31 +35,28 @@ public:
         bvh.build(meshes);
     }
 
-	// Behind the scene, this gets the left, right, bottom and top values using the other parameters
-	/* With respect to Horizontal FOV
-	* float tangent = tanf(fov/2 * DEG2RAD);
-	* float width = front * tangent;           // half width of near plane
-	* float height = right / aspectRatio;      // half height of near plane 
-	* 
-	* glFrustum(-width, width, -height, height, front, back);
-	*/
-	void setProjectionMatrix(float fov, float aspect, float nearPlane, float farPlane) {
-		gluPerspective(fov, aspect, nearPlane, farPlane);
-	}
+	// Get Projection Matrix
+	glm::mat4 getProjectionMatrix() const {
+		if (projectionMethod) {
+			return projectionMethod->getComposedProjectionMatrix();
+		}
+		return glm::mat4(1.0f);	
+    }
 
-	// Here left, right, bottom and top will be the screen coordinates
-	void setOrthogonalMatrix(float left, float right, float bottom, float top, float nearPlane, float farPlane) {
-		glOrtho(left, right, bottom, top, nearPlane, farPlane);
-	}
+    // Call this whenever screen size or camera mode changes
+    void updateProjection(int width, int height) {
+        float aspect = float(width) / float(height);
 
-    glm::mat4 getProjectionMatrix(int width, int height) const {
         if (camera.mode == PERSPECTIVE_MODE) {
-            return glm::perspective(glm::radians(camera.zoom), float(width) / float(height), camera.nearPlane, camera.farPlane);
+            projectionMethod = std::make_unique<PerspectiveProj>(
+                camera.zoom, aspect, camera.nearPlane, camera.farPlane);
         }
         else {
-            // Example orthographic, adjust as needed
-            float aspect = float(width) / float(height);
-            return glm::ortho(-aspect, aspect, -1.0f, 1.0f, camera.nearPlane, camera.farPlane);
+            float orthoZoom = 1.0f / camera.zoom;
+            projectionMethod = std::make_unique<OrthoProj>(
+                -aspect * orthoZoom, aspect * orthoZoom,
+                -orthoZoom, orthoZoom,
+                camera.nearPlane, camera.farPlane);
         }
     }
 
@@ -67,12 +67,10 @@ public:
 		// Set Projection Matrix
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
-		if (camera.mode == PERSPECTIVE_MODE) {
-			setProjectionMatrix(camera.zoom, (float)width/(float)height, camera.nearPlane, camera.farPlane);
-		}
-		else if (camera.mode == ORTHOGRAPHIC_MODE) {
-			setOrthogonalMatrix(-1, 1, -1, 1, camera.nearPlane, camera.farPlane);
-		}
+        if (projectionMethod) {
+            glm::mat4 proj = projectionMethod->getComposedProjectionMatrix();
+            glLoadMatrixf(glm::value_ptr(proj));
+        }
 
 		// Set Model View Matrix
 		glMatrixMode(GL_MODELVIEW);

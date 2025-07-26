@@ -135,6 +135,7 @@ public:
 	void preRender() {
 		if (isScreenResized) {
 			glViewport(0, 0, screenWidth, screenHeight);
+			model->updateProjection(screenWidth, screenHeight);
 			isScreenResized = FALSE;
 		}
 	}

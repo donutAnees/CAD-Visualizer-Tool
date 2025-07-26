@@ -63,10 +63,16 @@
     <ClInclude Include="ray.h">
       <Filter>Header Files\model</Filter>
     </ClInclude>
+    <ClInclude Include="projectionsystem.h">
+      <Filter>Header Files\model</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GameEngineOpenGL.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="projectionsystem.cpp">
+      <Filter>Header Files\model</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

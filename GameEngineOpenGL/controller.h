@@ -127,7 +127,7 @@ public:
 		mouseY = y;
 		// 1. Get camera matrices and window size
 		glm::mat4 viewMatrix = model->camera.getViewMatrix();
-		glm::mat4 projMatrix = model->getProjectionMatrix(view->getWindowWidth(), view->getWindowHeight());
+		glm::mat4 projMatrix = model->getProjectionMatrix();
 		int width = view->getWindowWidth();
 		int height = view->getWindowHeight();
 

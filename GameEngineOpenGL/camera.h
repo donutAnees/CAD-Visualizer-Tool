@@ -254,7 +254,7 @@ public:
 
 		// Place the camera at the required distance from the center, looking at the center
 		if (orbitMode) {
-			orbitTarget = center;
+			//orbitTarget = center;
 			orbitDistance = distance;
 			updateOrbitCameraViewMatrix();
 		}
