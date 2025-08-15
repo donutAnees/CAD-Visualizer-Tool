@@ -15,13 +15,13 @@ public:
 	bool loopThreadFlag;
 	HWND handle;
 	HWND parentHandle;
-	HWND sidebarHandle;
 	int mouseX;
 	int mouseY;
+	int selectedMeshIndex; // Track the currently selected mesh index
 
 	Controller(Model* model, View* view) : model(model), view(view), mouseX(0), mouseY(0),
-		handle(NULL), parentHandle(NULL), sidebarHandle(NULL),
-		loopThreadFlag(false) {
+		handle(NULL), parentHandle(NULL),
+		loopThreadFlag(false), selectedMeshIndex(-1) {
 	}
 
 	~Controller() {
@@ -32,10 +32,9 @@ public:
 		}
 	}
 
-	int create(HWND handle, HWND parentHandle, HWND sidebarHandle) {
+	int create(HWND handle, HWND parentHandle, HWND /* unused */) {
 		this->handle = handle;
 		this->parentHandle = parentHandle;
-		this->sidebarHandle = sidebarHandle;
 		// Create a context
 		if (!view->setContext(handle)) {
 			MessageBox(NULL, L"Failed to set context", L"Error", MB_OK);
@@ -146,19 +145,18 @@ public:
 		glm::vec3 rayOrigin, rayDir;
 		screenPointToRay(x, y, width, height, viewMatrix, projMatrix, model->camera, rayOrigin, rayDir);
 
-		testRayIntersections(rayOrigin.x, rayOrigin.y, rayOrigin.z, rayDir.x, rayDir.y, rayDir.z);
+		// Save the selected mesh index
+		selectedMeshIndex = testRayIntersections(rayOrigin.x, rayOrigin.y, rayOrigin.z, rayDir.x, rayDir.y, rayDir.z);
 	}
 
 	void createDialogHandle(wchar_t* objectType, int x, int y, int z, int size) {
 		if (wcscmp(objectType, L"Cube") == 0)
 		{
 			model->createCube(x, y, z, size);
-			updateSidebar();
 		}
 		else if (wcscmp(objectType, L"Pyramid") == 0)
 		{
 			model->createPyramid(x, y, z, size);
-			updateSidebar();
 		}
 		else
 		{
@@ -172,7 +170,7 @@ public:
 		wchar_t filePath[MAX_PATH] = L"";
 		ZeroMemory(&ofn, sizeof(ofn));
 		ofn.lStructSize = sizeof(ofn);
-		ofn.hwndOwner = NULL; // No specific owner window
+		ofn.hwndOwner = parentHandle; // Use parent window as owner
 		ofn.lpstrFile = filePath;
 		ofn.nMaxFile = MAX_PATH;
 		ofn.lpstrFilter = L"STL Files\0*.stl\0All Files\0*.*\0";
@@ -194,33 +192,15 @@ public:
 		std::wstring filePath = openFileExplorer();
 		if (!filePath.empty()) {
 			model->createFromFile(filePath);
-			updateSidebar();
 		}
 		else {
 			MessageBox(parentHandle, L"No file selected", L"Error", MB_OK);
 		}
 	}
 
-	// Update the sidebar with the list of objects
-	void updateSidebar() {
-		HWND hList = GetDlgItem(sidebarHandle, IDC_OBJECT_LIST);
-		if (!hList) return;
-
-		SendMessage(hList, LB_RESETCONTENT, 0, 0);
-
-		for (size_t i = 0; i < model->meshes.size(); ++i) {
-			std::wstringstream ss;
-			ss << L"Object " << (i + 1);
-			SendMessage(hList, LB_ADDSTRING, 0, (LPARAM)ss.str().c_str());
-		}
-	}
-
 	Mesh* getSelectedMesh() {
-		HWND hList = GetDlgItem(sidebarHandle, IDC_OBJECT_LIST);
-		if (!hList) return nullptr;
-		int sel = (int)SendMessage(hList, LB_GETCURSEL, 0, 0);
-		if (sel >= 0 && sel < (int)model->meshes.size()) {
-			return &model->meshes[sel];
+		if (selectedMeshIndex >= 0 && selectedMeshIndex < (int)model->meshes.size()) {
+			return &model->meshes[selectedMeshIndex];
 		}
 		return nullptr;
 	}
@@ -241,12 +221,9 @@ public:
 	}
 
 	void deleteSelectedObject() {
-		HWND hList = GetDlgItem(sidebarHandle, IDC_OBJECT_LIST);
-		if (!hList) return;
-		int sel = (int)SendMessage(hList, LB_GETCURSEL, 0, 0);
-		if (sel >= 0 && sel < (int)model->meshes.size()) {
-			model->meshes.erase(model->meshes.begin() + sel);
-			updateSidebar();
+		if (selectedMeshIndex >= 0 && selectedMeshIndex < (int)model->meshes.size()) {
+			model->meshes.erase(model->meshes.begin() + selectedMeshIndex);
+			selectedMeshIndex = -1; // Reset selection
 		}
 	}
 
@@ -280,7 +257,8 @@ public:
 		}
 	}
 
-	void testRayIntersections(float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
+	// Returns the index of the intersected mesh, or -1 if no intersection
+	int testRayIntersections(float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
 		Ray ray(glm::vec3(originX, originY, originZ), glm::vec3(dirX, dirY, dirZ), 0.0f, 100.0f);
 
 		std::vector<Face*> hitFaces;
@@ -306,7 +284,10 @@ public:
 			}
 			ss << L"\n";
 			OutputDebugString(ss.str().c_str());
-		}
 			
+			return meshIndex;
+		}
+		
+		return -1;
 	}
 };
