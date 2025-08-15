@@ -28,6 +28,7 @@ Controller controller(&model, &view);
 
 // To track the selected mesh and position from context menu
 int g_selectedMeshIdx = -1;
+int g_selectedFaceIdx = -1;
 POINT g_clickPoint;
 
 // Forward declarations of functions included in this code module:
@@ -256,7 +257,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_CONTEXT_DELETE:
                 if (g_selectedMeshIdx >= 0 && g_selectedMeshIdx < (int)model.meshes.size()) {
                     model.deleteMesh(g_selectedMeshIdx);
-                    g_selectedMeshIdx = -1; // Reset selection
+                    controller.clearAllSelections();
+                    g_selectedMeshIdx = -1;
+                    g_selectedFaceIdx = -1;
                 }
                 break;
             case IDM_CONTEXT_ORBIT:
@@ -318,7 +321,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 }
 
 // Test ray intersection and return the index of the selected mesh
-int GetSelectedMeshIndex(int x, int y) {
+void GetSelectedIndices(int x, int y, int& outMeshIndex, int& outFaceIndex) {
     // Get camera matrices and window size
     glm::mat4 viewMatrix = model.camera.getViewMatrix();
     glm::mat4 projMatrix = model.getProjectionMatrix();
@@ -329,46 +332,20 @@ int GetSelectedMeshIndex(int x, int y) {
     glm::vec3 rayOrigin, rayDir;
     controller.screenPointToRay(x, y, width, height, viewMatrix, projMatrix, model.camera, rayOrigin, rayDir);
 
-    // Create ray and do intersection test
+    // Create ray and find intersections
     Ray ray(rayOrigin, rayDir, 0.0f, 100.0f);
-    std::vector<Face*> hitFaces;
-    
-    // Use the current spatial accelerator
-    if (model.accelerator) {
-        // Get the root node based on the accelerator type
-#if SPACIAL_OPT_MODE == SPACIAL_OPT_MEMORY
-        void* root = static_cast<BVH*>(model.accelerator.get())->getRoot();
-#else
-        void* root = static_cast<KDTree*>(model.accelerator.get())->getRoot();
-#endif
-        model.accelerator->traverse(root, ray, hitFaces);
-    }
-    
-    if (!hitFaces.empty()) {
-        Face* firstHit = hitFaces[0];
-        int meshIndex = -1;
-        
-        // Find which mesh owns this face
-        for (size_t m = 0; m < model.meshes.size(); ++m) {
-            for (size_t f = 0; f < model.meshes[m].faces.size(); ++f) {
-                if (&model.meshes[m].faces[f] == firstHit) {
-                    meshIndex = (int)m;
-                    break;
-                }
-            }
-            if (meshIndex != -1) break;
-        }
-        
-        return meshIndex;
-    }
-    
-    return -1;
+    controller.findRayIntersection(ray, outMeshIndex, outFaceIndex);
 }
 
 LRESULT CALLBACK ChildWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
     case WM_LBUTTONDOWN: {
         controller.handleMouseDown(wParam, LOWORD(lParam), HIWORD(lParam));
+        
+        // Update global selection state to match controller's state
+        g_selectedMeshIdx = controller.selectedMeshIndex;
+        g_selectedFaceIdx = controller.selectedFaceIndex;
+        
         SetFocus(GetParent(hWnd)); // Give focus to the parent window
     }
         break;
@@ -378,7 +355,7 @@ LRESULT CALLBACK ChildWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
         g_clickPoint.y = HIWORD(lParam);
         
         // Determine which mesh (if any) is at the click position
-        g_selectedMeshIdx = GetSelectedMeshIndex(g_clickPoint.x, g_clickPoint.y);
+        GetSelectedIndices(g_clickPoint.x, g_clickPoint.y, g_selectedMeshIdx, g_selectedFaceIdx);
         
         // Only show context menu if an object was clicked
         if (g_selectedMeshIdx >= 0) {

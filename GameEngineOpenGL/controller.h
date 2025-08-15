@@ -18,10 +18,11 @@ public:
 	int mouseX;
 	int mouseY;
 	int selectedMeshIndex; // Track the currently selected mesh index
+	int selectedFaceIndex; // Track the currently selected face index
 
 	Controller(Model* model, View* view) : model(model), view(view), mouseX(0), mouseY(0),
 		handle(NULL), parentHandle(NULL),
-		loopThreadFlag(false), selectedMeshIndex(-1) {
+		loopThreadFlag(false), selectedMeshIndex(-1), selectedFaceIndex(-1) {
 	}
 
 	~Controller() {
@@ -98,6 +99,14 @@ public:
 		view->setWindowSize(view->getWindowWidth(), view->getWindowHeight());
 	}
 
+	// Clear selection for all meshes
+	void clearAllSelections() {
+		for (auto& mesh : model->meshes) {
+			mesh.setSelected(false);
+		}
+		selectedMeshIndex = -1;
+		selectedFaceIndex = -1;
+	}
 
 	// Handles camera rotation based on mouse movement
 	void handleMouseInput(WPARAM state, float x, float y) {
@@ -136,7 +145,7 @@ public:
 			outDir = glm::normalize(glm::vec3(farWorldPoint) - glm::vec3(nearWorldPoint));
 		}
 		else {
-			// Perspective projection - use existing method
+			// Perspective projection
 			glm::vec4 rayClip(x, y, -1.0f, 1.0f);
 
 			// Eye space
@@ -166,8 +175,54 @@ public:
 		glm::vec3 rayOrigin, rayDir;
 		screenPointToRay(x, y, width, height, viewMatrix, projMatrix, model->camera, rayOrigin, rayDir);
 
-		// Save the selected mesh index
-		selectedMeshIndex = testRayIntersections(rayOrigin.x, rayOrigin.y, rayOrigin.z, rayDir.x, rayDir.y, rayDir.z);
+		// 3. Perform ray test to find intersections and track both mesh and face indices
+		int meshIndex = -1;
+		int faceIndex = -1;
+		Ray ray(rayOrigin, rayDir, 0.0f, 100.0f);
+		findRayIntersection(ray, meshIndex, faceIndex);
+        
+        // 4. Selection logic:
+        if (meshIndex >= 0) {
+            // Clicked on an object
+            if (selectedMeshIndex == meshIndex) {
+                // Clicked on the same object - select triangle or deselect object
+                if (faceIndex >= 0) {
+                    // If we clicked on a different triangle of the same mesh
+                    if (selectedFaceIndex != faceIndex) {
+                        // Select the specific triangle (keep the mesh selected)
+                        selectFace(meshIndex, faceIndex);
+						selectedFaceIndex = faceIndex;
+                    } 
+                    // If clicked on same triangle, do nothing (keep it selected)
+                }
+            } 
+            else {
+                // Clicked on a different object - clear previous selection and select new object
+                clearAllSelections();
+                selectMesh(meshIndex);
+            }
+        } 
+        else {
+            // Clicked on nothing - deselect everything
+            clearAllSelections();
+        }
+
+        // Save the selected mesh index for the controller state
+		selectedMeshIndex = meshIndex;
+	}
+
+	void selectMesh(int meshIndex) {
+	    if (meshIndex >= 0 && meshIndex < static_cast<int>(model->meshes.size())) {
+	        model->meshes[meshIndex].setSelected(true);
+	    }
+	}
+	
+	void selectFace(int meshIndex, int faceIndex) {
+	    if (meshIndex >= 0 && meshIndex < static_cast<int>(model->meshes.size())) {
+	        if (faceIndex >= 0 && faceIndex < static_cast<int>(model->meshes[meshIndex].faces.size())) {
+	            model->meshes[meshIndex].selectFace(faceIndex);
+	        }
+	    }
 	}
 
 	void createDialogHandle(wchar_t* objectType, int x, int y, int z, int size) {
@@ -245,6 +300,7 @@ public:
 		if (selectedMeshIndex >= 0 && selectedMeshIndex < (int)model->meshes.size()) {
 			model->deleteMesh(selectedMeshIndex);
 			selectedMeshIndex = -1; // Reset selection
+			selectedFaceIndex = -1;
 		}
 	}
 
@@ -278,15 +334,17 @@ public:
 		}
 	}
 
-	// Returns the index of the intersected mesh, or -1 if no intersection
-	int testRayIntersections(float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
-		Ray ray(glm::vec3(originX, originY, originZ), glm::vec3(dirX, dirY, dirZ), 0.0f, 100.0f);
-
-		std::vector<Face*> hitFaces;
+	// Helper method to find the intersection of a ray with the closest face
+	void findRayIntersection(const Ray& ray, int& outMeshIndex, int& outFaceIndex) {
+		outMeshIndex = -1;
+		outFaceIndex = -1;
 		
-		// Use the current spatial accelerator
+		std::vector<Face*> hitFaces;
+		float closestDistance = std::numeric_limits<float>::max();
+		Face* closestFace = nullptr;
+		
+		// Use the spatial accelerator to efficiently get hit faces
 		if (model->accelerator) {
-			// Get the root node based on the accelerator type
 		#if SPACIAL_OPT_MODE == SPACIAL_OPT_MEMORY
 			void* root = static_cast<BVH*>(model->accelerator.get())->getRoot();
 		#else
@@ -296,29 +354,51 @@ public:
 		}
 		
 		if (!hitFaces.empty()) {
-			Face* firstHit = hitFaces[0];
-			int meshIndex = -1, faceIndex = -1;
-			for (size_t m = 0; m < model->meshes.size(); ++m) {
-				for (size_t f = 0; f < model->meshes[m].faces.size(); ++f) {
-					if (&model->meshes[m].faces[f] == firstHit) {
-						meshIndex = (int)m;
-						faceIndex = (int)f;
-						break;
+			// Find the closest face by computing distances
+			for (Face* face : hitFaces) {
+				// For simplicity, use the centroid of the face to determine distance
+				float dist = glm::length(face->centroid - ray.origin);
+				if (dist < closestDistance) {
+					closestDistance = dist;
+					closestFace = face;
+				}
+			}
+			
+			// Find which mesh and face index this belongs to
+			if (closestFace != nullptr) {
+				for (size_t m = 0; m < model->meshes.size(); ++m) {
+					const Mesh& mesh = model->meshes[m];
+					for (size_t f = 0; f < mesh.faces.size(); ++f) {
+						if (&mesh.faces[f] == closestFace) {
+							outMeshIndex = static_cast<int>(m);
+							outFaceIndex = static_cast<int>(f);
+							return;
+						}
 					}
 				}
-				if (meshIndex != -1) break;
 			}
+		}
+		
+		// If we didn't hit any faces or couldn't identify the mesh/face, leave outputs as -1
+	}
+
+	// Returns the index of the intersected mesh, or -1 if no intersection
+	int testRayIntersections(float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
+		Ray ray(glm::vec3(originX, originY, originZ), glm::vec3(dirX, dirY, dirZ), 0.0f, 100.0f);
+
+		int meshIndex, faceIndex;
+		findRayIntersection(ray, meshIndex, faceIndex);
+		
+		if (meshIndex != -1) {
 			std::wstringstream ss;
-			ss << L"[Picking] Intersections found: " << hitFaces.size();
-			if (meshIndex != -1) {
-				ss << L", First hit: Mesh " << meshIndex << L", Face " << faceIndex;
+			ss << L"[Picking] Intersection found: Mesh " << meshIndex;
+			if (faceIndex != -1) {
+				ss << L", Face " << faceIndex;
 			}
 			ss << L"\n";
 			OutputDebugString(ss.str().c_str());
-			
-			return meshIndex;
 		}
 		
-		return -1;
+		return meshIndex;
 	}
 };

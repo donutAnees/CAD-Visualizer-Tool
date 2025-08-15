@@ -153,6 +153,8 @@ public:
 	GLfloat rotationX, rotationY, rotationZ; // Rotation angles in degrees
     bool showBoundingBox = false;
     bool showVertices = false;
+    bool isSelected = false; // Flag to indicate if the mesh is selected
+    int selectedFaceIndex = -1; // Index of the selected triangle/face
 	// Model Matrix to apply transformations
 	glm::mat4 modelMatrix = glm::mat4(1.0f); 
 
@@ -250,6 +252,10 @@ public:
 		rotationX = 0.0f;
 		rotationY = 0.0f;
 		rotationZ = 0.0f;
+        
+        // Reset selection state
+        isSelected = false;
+        selectedFaceIndex = -1;
 
 		// Construct faces from indices
 		constructFaces();
@@ -294,7 +300,52 @@ public:
 			glColor4f(1.0f, 1.0f, 1.0f, 0.5f); // Set transparency (alpha = 0.5)
         }
 
-        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, indices.data());
+        // Draw the mesh with highlight for selection if needed
+        if (isSelected) {
+            // Option 1: Highlight the entire mesh
+            if (selectedFaceIndex < 0) {
+                // Draw mesh with normal colors
+                glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, indices.data());
+                
+                // Then draw a wireframe overlay to highlight it
+                glDisableClientState(GL_COLOR_ARRAY);
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                glLineWidth(2.0f);
+                glColor3f(1.0f, 1.0f, 0.0f); // Yellow highlight
+                glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, indices.data());
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                glLineWidth(1.0f);
+            } 
+            // Option 2: Highlight specific triangle
+            else if (selectedFaceIndex >= 0 && selectedFaceIndex < static_cast<int>(faces.size())) {
+                // Draw non-selected triangles normally
+                for (int i = 0; i < static_cast<int>(faces.size()); ++i) {
+                    if (i != selectedFaceIndex) {
+                        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, &indices[i * 3]);
+                    }
+                }
+                
+                // Draw the selected triangle with highlight
+                glDisableClientState(GL_COLOR_ARRAY);
+                // Fill with semi-transparent highlight
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                glColor4f(1.0f, 0.5f, 0.0f, 0.7f); // Orange highlight with transparency
+                glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, &indices[selectedFaceIndex * 3]);
+                
+                // Draw outline
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                glLineWidth(3.0f);
+                glColor3f(1.0f, 0.8f, 0.0f); // Yellow-orange outline
+                glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, &indices[selectedFaceIndex * 3]);
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                glLineWidth(1.0f);
+                glDisable(GL_BLEND);
+            }
+        } else {
+            // Draw normally if not selected
+            glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, indices.data());
+        }
 
         if (isTransparent) {
             glDisable(GL_BLEND);
@@ -309,7 +360,6 @@ public:
         if (showVertices) {
             drawVertices();
         }
-
     }
 
     void drawLocalAxis() const {
@@ -488,7 +538,6 @@ public:
 
         // Reconstruct the faces
         constructFaces();
-
     }
 
     // Draws points at each vertex of the mesh
@@ -564,5 +613,23 @@ public:
         showVertices = !showVertices;
     }
 
+    // Set or clear the selected state
+    void setSelected(bool selected) {
+        isSelected = selected;
+        if (!selected) {
+            selectedFaceIndex = -1;
+        }
+    }
 
+    // Select a specific face/triangle
+    void selectFace(int faceIndex) {
+        if (faceIndex >= 0 && faceIndex < static_cast<int>(faces.size())) {
+            selectedFaceIndex = faceIndex;
+        }
+    }
+
+    // Check if this mesh has a specific face selected
+    bool hasFaceSelected() const {
+        return isSelected && selectedFaceIndex >= 0;
+    }
 };
