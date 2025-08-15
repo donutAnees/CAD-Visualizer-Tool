@@ -226,9 +226,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 DestroyWindow(hWnd);
                 break;
             case IDM_VIEW_ORTHO:
+                model.camera.setCameraMode(ORTHOGRAPHIC_MODE);
+                model.updateProjection(view.getWindowWidth(), view.getWindowHeight());
                 break;
             case IDM_VIEW_PERSP:
+                model.camera.setCameraMode(PERSPECTIVE_MODE);
+                model.updateProjection(view.getWindowWidth(), view.getWindowHeight());
                 break;
+
             case IDM_OBJECT:
             {
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_OBJECT_DIALOG), hWnd, ObjectDialogProc);
@@ -283,6 +288,16 @@ LRESULT CALLBACK ChildWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
     case WM_MOUSEMOVE:
         controller.handleMouseInput(wParam, LOWORD(lParam), HIWORD(lParam));
         break;
+    case WM_MOUSEWHEEL: {
+        short delta = GET_WHEEL_DELTA_WPARAM(wParam);
+        if (delta > 0) {
+            controller.zoomIn();
+        }
+        else if (delta < 0) {
+            controller.zoomOut();
+        }
+        break;
+    }
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }

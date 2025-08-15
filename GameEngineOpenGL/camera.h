@@ -53,7 +53,7 @@ public:
 		orbitMode = false;
 		orbitTarget = glm::vec3(0.0f, 0.0f, 0.0f);
 		orbitDistance = 10.0f;
-		zoom = FOV;
+		zoom = (ORTHOGRAPHIC_MODE) ? 1/10.0f : FOV;
 		// Initialize the view matrix
 		updateViewMatrix();
     }
@@ -95,7 +95,43 @@ public:
 	}
 
 	void setCameraMode(unsigned int mode) {
+		if (mode == ORTHOGRAPHIC_MODE) {
+			zoom = 1.0f;
+		}
+		else if (mode == PERSPECTIVE_MODE) {
+			zoom = FOV; 
+		}
 		this->mode = mode;
+	}
+
+	void zoomIn(float amount) {
+		if (mode == ORTHOGRAPHIC_MODE) {
+			// Increase zoom 
+			zoom *= (1.0f + amount);
+			if (zoom > 10.0f) zoom = 10.0f;
+			if (zoom < 0.01f) zoom = 0.01f;
+		}
+		else if (mode == PERSPECTIVE_MODE) {
+			// Decrease FOV 
+			zoom -= amount * 10.0f;
+			if (zoom < 10.0f) zoom = 10.0f;
+			if (zoom > 120.0f) zoom = 120.0f;
+		}
+	}
+
+	void zoomOut(float amount) {
+		if (mode == ORTHOGRAPHIC_MODE) {
+			// Decrease zoom
+			zoom /= (1.0f + amount);
+			if (zoom > 10.0f) zoom = 10.0f;
+			if (zoom < 0.01f) zoom = 0.01f;
+		}
+		else if (mode == PERSPECTIVE_MODE) {
+			// Increase FOV
+			zoom += amount * 10.0f;
+			if (zoom < 10.0f) zoom = 10.0f;
+			if (zoom > 120.0f) zoom = 120.0f;
+		}
 	}
 
 	void setOrbitMode(bool enabled, const glm::vec3& target = glm::vec3(0.0f, 0.0f, 0.0f), float distance = 10.0f) {
@@ -243,30 +279,52 @@ public:
     }
 
 	void zoomToBoundingBox(glm::vec3 center, glm::vec3 size, float aspectRatio) {
-		float radius = glm::length(size) * 0.5f;
-
-		float fovY = glm::radians(zoom);
-		float fovX = 2.0f * atanf(tanf(fovY / 2.0f) * aspectRatio);
-
-		float distanceY = radius / tan(fovY / 2.0f);
-		float distanceX = radius / tan(fovX / 2.0f);
-		float distance = std::max(distanceY, distanceX);
-
-		// Place the camera at the required distance from the center, looking at the center
-		if (orbitMode) {
-			//orbitTarget = center;
-			orbitDistance = distance;
-			updateOrbitCameraViewMatrix();
-		}
-		else {
-			// Move the camera along its current forward direction, but so it looks at the center
-			glm::vec3 front;
-			front.x = cos(glm::radians(angle.y)) * cos(glm::radians(angle.x));
-			front.y = sin(glm::radians(angle.x));
-			front.z = sin(glm::radians(angle.y)) * cos(glm::radians(angle.x));
-			front = glm::normalize(front);
-			position = center - front * distance;
+		if (mode == ORTHOGRAPHIC_MODE) {
+			// Find the largest dimension, adjust for aspect ratio
+			float width = size.x;
+			float height = size.y;
+			float depth = size.z;
+			float viewWidth = width;
+			float viewHeight = height;
+			if (aspectRatio > 1.0f) {
+				viewWidth = std::max(width, height * aspectRatio);
+				viewHeight = viewWidth / aspectRatio;
+			}
+			else {
+				viewHeight = std::max(height, width / aspectRatio);
+				viewWidth = viewHeight * aspectRatio;
+			}
+			// Set zoom so the object fits
+			zoom = 2.0f / std::max(viewWidth, viewHeight); 
+			position = center; 
 			updateFreeCameraViewMatrix();
+		}
+		else if (mode == PERSPECTIVE_MODE) {
+			float radius = glm::length(size) * 0.5f;
+
+			float fovY = glm::radians(zoom);
+			float fovX = 2.0f * atanf(tanf(fovY / 2.0f) * aspectRatio);
+
+			float distanceY = radius / tan(fovY / 2.0f);
+			float distanceX = radius / tan(fovX / 2.0f);
+			float distance = std::max(distanceY, distanceX);
+
+			// Place the camera at the required distance from the center, looking at the center
+			if (orbitMode) {
+				//orbitTarget = center;
+				orbitDistance = distance;
+				updateOrbitCameraViewMatrix();
+			}
+			else {
+				// Move the camera along its current forward direction, but so it looks at the center
+				glm::vec3 front;
+				front.x = cos(glm::radians(angle.y)) * cos(glm::radians(angle.x));
+				front.y = sin(glm::radians(angle.x));
+				front.z = sin(glm::radians(angle.y)) * cos(glm::radians(angle.x));
+				front = glm::normalize(front);
+				position = center - front * distance;
+				updateFreeCameraViewMatrix();
+			}
 		}
 	}
  };

@@ -89,6 +89,17 @@ public:
 		}
 	}
 
+	void zoomIn() {
+		model->camera.zoomIn(0.1f);
+		view->setWindowSize(view->getWindowWidth(), view->getWindowHeight());
+	}
+
+	void zoomOut() {
+		model->camera.zoomOut(0.1f);
+		view->setWindowSize(view->getWindowWidth(), view->getWindowHeight());
+	}
+
+
 	// Handles camera rotation based on mouse movement
 	void handleMouseInput(WPARAM state, float x, float y) {
 		if (state == MK_LBUTTON)
