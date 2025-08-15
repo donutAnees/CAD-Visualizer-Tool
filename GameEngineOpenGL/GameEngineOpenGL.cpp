@@ -255,7 +255,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 break;
             case IDM_CONTEXT_DELETE:
                 if (g_selectedMeshIdx >= 0 && g_selectedMeshIdx < (int)model.meshes.size()) {
-                    model.meshes.erase(model.meshes.begin() + g_selectedMeshIdx);
+                    model.deleteMesh(g_selectedMeshIdx);
                     g_selectedMeshIdx = -1; // Reset selection
                 }
                 break;
@@ -332,7 +332,17 @@ int GetSelectedMeshIndex(int x, int y) {
     // Create ray and do intersection test
     Ray ray(rayOrigin, rayDir, 0.0f, 100.0f);
     std::vector<Face*> hitFaces;
-    model.bvh.traverse(model.bvh.getRoot(), ray, hitFaces);
+    
+    // Use the current spatial accelerator
+    if (model.accelerator) {
+        // Get the root node based on the accelerator type
+#if SPACIAL_OPT_MODE == SPACIAL_OPT_MEMORY
+        void* root = static_cast<BVH*>(model.accelerator.get())->getRoot();
+#else
+        void* root = static_cast<KDTree*>(model.accelerator.get())->getRoot();
+#endif
+        model.accelerator->traverse(root, ray, hitFaces);
+    }
     
     if (!hitFaces.empty()) {
         Face* firstHit = hitFaces[0];
@@ -510,29 +520,28 @@ INT_PTR CALLBACK PropertiesDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
         {
             if (g_selectedMeshIdx >= 0 && g_selectedMeshIdx < (int)model.meshes.size())
             {
-                Mesh& mesh = model.meshes[g_selectedMeshIdx];
-                
                 // Get values from dialog
                 wchar_t buffer[32];
+                float rotX, rotY, rotZ, posX, posY, posZ;
                 
                 // Rotation
                 GetDlgItemText(hDlg, IDC_PROP_ROT_X, buffer, 32);
-                mesh.rotationX = (float)_wtof(buffer);
+                rotX = (float)_wtof(buffer);
                 GetDlgItemText(hDlg, IDC_PROP_ROT_Y, buffer, 32);
-                mesh.rotationY = (float)_wtof(buffer);
+                rotY = (float)_wtof(buffer);
                 GetDlgItemText(hDlg, IDC_PROP_ROT_Z, buffer, 32);
-                mesh.rotationZ = (float)_wtof(buffer);
+                rotZ = (float)_wtof(buffer);
                 
                 // Position
                 GetDlgItemText(hDlg, IDC_PROP_POS_X, buffer, 32);
-                mesh.centerX = (float)_wtof(buffer);
+                posX = (float)_wtof(buffer);
                 GetDlgItemText(hDlg, IDC_PROP_POS_Y, buffer, 32);
-                mesh.centerY = (float)_wtof(buffer);
+                posY = (float)_wtof(buffer);
                 GetDlgItemText(hDlg, IDC_PROP_POS_Z, buffer, 32);
-                mesh.centerZ = (float)_wtof(buffer);
+                posZ = (float)_wtof(buffer);
                 
-                // Update the mesh
-                mesh.updateMesh();
+                // Update the mesh using the Model's method which will also rebuild the spatial accelerator
+                model.updateMeshProperties(g_selectedMeshIdx, rotX, rotY, rotZ, posX, posY, posZ);
             }
             
             EndDialog(hDlg, LOWORD(wParam));

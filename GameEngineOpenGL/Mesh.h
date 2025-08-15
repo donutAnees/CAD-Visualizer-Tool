@@ -486,6 +486,9 @@ public:
             transformedBoundingBoxCorners[i] = modelMatrix * corners[i];
         }
 
+        // Reconstruct the faces
+        constructFaces();
+
     }
 
     // Draws points at each vertex of the mesh

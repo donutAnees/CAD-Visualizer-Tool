@@ -117,18 +117,39 @@ public:
 		// Convert to normalized device coordinates
 		float x = (2.0f * mouseX) / screenWidth - 1.0f;
 		float y = 1.0f - (2.0f * mouseY) / screenHeight;
-		glm::vec4 rayClip(x, y, -1.0f, 1.0f);
 
-		// Eye space
-		glm::vec4 rayEye = glm::inverse(projection) * rayClip;
-		rayEye = glm::vec4(rayEye.x, rayEye.y, -1.0f, 0.0f);
+		if (camera.mode == ORTHOGRAPHIC_MODE) {
+			glm::vec4 nearPoint(x, y, -1.0f, 1.0f);
+			glm::vec4 farPoint(x, y, 1.0f, 1.0f);
 
-		// World space
-		glm::vec3 rayWorld = glm::normalize(glm::vec3(glm::inverse(view) * rayEye));
+			// Convert to world space
+			glm::mat4 invViewProj = glm::inverse(projection * view);
+			glm::vec4 nearWorldPoint = invViewProj * nearPoint;
+			glm::vec4 farWorldPoint = invViewProj * farPoint;
 
-		// Camera position as ray origin
-		outOrigin = model->camera.getPosition(); 
-		outDir = rayWorld;
+			// Convert to cartesian coordinates
+			if (nearWorldPoint.w != 0.0f) nearWorldPoint /= nearWorldPoint.w;
+			if (farWorldPoint.w != 0.0f) farWorldPoint /= farWorldPoint.w;
+
+			// Calculate ray origin and direction
+			outOrigin = glm::vec3(nearWorldPoint);
+			outDir = glm::normalize(glm::vec3(farWorldPoint) - glm::vec3(nearWorldPoint));
+		}
+		else {
+			// Perspective projection - use existing method
+			glm::vec4 rayClip(x, y, -1.0f, 1.0f);
+
+			// Eye space
+			glm::vec4 rayEye = glm::inverse(projection) * rayClip;
+			rayEye = glm::vec4(rayEye.x, rayEye.y, -1.0f, 0.0f);
+
+			// World space
+			glm::vec3 rayWorld = glm::normalize(glm::vec3(glm::inverse(view) * rayEye));
+
+			// Camera position as ray origin
+			outOrigin = model->camera.getPosition();
+			outDir = rayWorld;
+		}
 	}
 	
 	// Handles mouse button down events, for object selection or other actions
@@ -222,7 +243,7 @@ public:
 
 	void deleteSelectedObject() {
 		if (selectedMeshIndex >= 0 && selectedMeshIndex < (int)model->meshes.size()) {
-			model->meshes.erase(model->meshes.begin() + selectedMeshIndex);
+			model->deleteMesh(selectedMeshIndex);
 			selectedMeshIndex = -1; // Reset selection
 		}
 	}
@@ -262,7 +283,17 @@ public:
 		Ray ray(glm::vec3(originX, originY, originZ), glm::vec3(dirX, dirY, dirZ), 0.0f, 100.0f);
 
 		std::vector<Face*> hitFaces;
-		model->bvh.traverse(model->bvh.getRoot(), ray, hitFaces);
+		
+		// Use the current spatial accelerator
+		if (model->accelerator) {
+			// Get the root node based on the accelerator type
+		#if SPACIAL_OPT_MODE == SPACIAL_OPT_MEMORY
+			void* root = static_cast<BVH*>(model->accelerator.get())->getRoot();
+		#else
+			void* root = static_cast<KDTree*>(model->accelerator.get())->getRoot();
+		#endif
+			model->accelerator->traverse(root, ray, hitFaces);
+		}
 		
 		if (!hitFaces.empty()) {
 			Face* firstHit = hitFaces[0];

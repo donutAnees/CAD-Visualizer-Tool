@@ -17,10 +17,12 @@ public:
 	Camera camera;
 	std::vector<Mesh> meshes;
 	Grid grid;
-    BVH bvh;
+    std::unique_ptr<SpatialAccelerator> accelerator;
     std::unique_ptr<ViewProjMethodGLM> projectionMethod;
 
 	Model() : camera(), grid(camera) {
+        // Create the appropriate spatial accelerator based on optimization mode
+        accelerator.reset(SpatialAcceleratorFactory::createAccelerator());
 	}
 
 	void init() {
@@ -31,8 +33,10 @@ public:
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 
-    void buildBVH() {
-        bvh.build(meshes);
+    void buildAccelerator() {
+        if (accelerator) {
+            accelerator->build(meshes);
+        }
     }
 
 	// Get Projection Matrix
@@ -85,8 +89,30 @@ public:
 			mesh.draw();
 			mesh.drawLocalAxis(); // Draw local axis for each mesh
 		}
-		bvh.drawBVHNode(bvh.getRoot());
-	}
+
+    }
+
+    // Update mesh properties and rebuild spatial accelerator
+    void updateMeshProperties(int meshIndex, float rotX, float rotY, float rotZ, 
+                              float posX, float posY, float posZ) {
+        if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size())) {
+            Mesh& mesh = meshes[meshIndex];
+            
+            // Update mesh properties
+            mesh.rotationX = rotX;
+            mesh.rotationY = rotY;
+            mesh.rotationZ = rotZ;
+            mesh.centerX = posX;
+            mesh.centerY = posY;
+            mesh.centerZ = posZ;
+            
+            // Update the mesh geometry
+            mesh.updateMesh();
+            
+            // Rebuild spatial accelerator because mesh geometry changed
+            buildAccelerator();
+        }
+    }
 
     void createCube(int x, int y, int z, float size) {
         Mesh mesh;
@@ -140,7 +166,7 @@ public:
 
 		mesh.init(vertices, colors, indices);
         meshes.push_back(mesh);
-		bvh.build(meshes);
+		buildAccelerator();
     }
 
 
@@ -178,18 +204,25 @@ public:
        };
        mesh.init(vertices, colors, indices);
        meshes.push_back(mesh);
-	   bvh.build(meshes);
+	   buildAccelerator();
     }
 
     void createFromFile(std::wstring filePath) {
 		Mesh mesh;
 		if (mesh.loadFromSTL(std::string(filePath.begin(), filePath.end()))) {
 			meshes.push_back(mesh);
-			bvh.build(meshes);
+			buildAccelerator();
 			MessageBox(NULL, L"File loaded successfully!", L"Info", MB_OK);
 		} 
 		else {
 			MessageBox(NULL, L"Failed to load the file.", L"Error", MB_OK);
 		}
+    }
+    
+    void deleteMesh(int index) {
+        if (index >= 0 && index < static_cast<int>(meshes.size())) {
+            meshes.erase(meshes.begin() + index);
+            buildAccelerator();
+        }
     }
 };
