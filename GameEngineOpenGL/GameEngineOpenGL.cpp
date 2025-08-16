@@ -454,6 +454,13 @@ INT_PTR CALLBACK ObjectDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
         // Initialize the dialog (e.g., populate the combo box)
         SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Cube");
         SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Pyramid");
+        SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Circle");
+        SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Cylinder");
+        SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Sphere");
+        SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Cone");
+        SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Torus");
+        SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Plane");
+        ShowWindow(GetDlgItem(hDlg, IDC_SIZE), SW_HIDE); // Hide the size input field
         return (INT_PTR)TRUE;
 
     case WM_COMMAND:
@@ -463,20 +470,18 @@ INT_PTR CALLBACK ObjectDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             wchar_t objectType[50];
             GetDlgItemText(hDlg, IDC_OBJECT_TYPE, objectType, 50);
 
-            wchar_t posX[10], posY[10], posZ[10], size[10];
+            wchar_t posX[10], posY[10], posZ[10];
             GetDlgItemText(hDlg, IDC_POSITION_X, posX, 10);
             GetDlgItemText(hDlg, IDC_POSITION_Y, posY, 10);
             GetDlgItemText(hDlg, IDC_POSITION_Z, posZ, 10);
-            GetDlgItemText(hDlg, IDC_SIZE, size, 10);
 
             // Convert input to appropriate types
             float x = _wtof(posX);
             float y = _wtof(posY);
             float z = _wtof(posZ);
-            float ObjectSize = _wtof(size);
 
-            // Create the object (example: create a cube)
-			controller.createDialogHandle(objectType,x,y,z,ObjectSize);
+            // Create the object
+            controller.createDialogHandle(objectType, x, y, z);
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;

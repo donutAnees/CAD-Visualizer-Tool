@@ -249,14 +249,38 @@ public:
 	    }
 	}
 
-	void createDialogHandle(wchar_t* objectType, int x, int y, int z, int size) {
+	void createDialogHandle(wchar_t* objectType, int x, int y, int z) {
 		if (wcscmp(objectType, L"Cube") == 0)
 		{
-			model->createCube(x, y, z, size);
+			model->createCube(x, y, z);
 		}
 		else if (wcscmp(objectType, L"Pyramid") == 0)
 		{
-			model->createPyramid(x, y, z, size);
+			model->createPyramid(x, y, z);
+		}
+		else if (wcscmp(objectType, L"Circle") == 0)
+		{
+			model->createCircle(x, y, z);
+		}
+		else if (wcscmp(objectType, L"Cylinder") == 0)
+		{
+			model->createCylinder(x, y, z);
+		}
+		else if (wcscmp(objectType, L"Sphere") == 0)
+		{
+			model->createSphere(x, y, z);
+		}
+		else if (wcscmp(objectType, L"Cone") == 0)
+		{
+			model->createCone(x, y, z);
+		}
+		else if (wcscmp(objectType, L"Torus") == 0)
+		{
+			model->createTorus(x, y, z);
+		}
+		else if (wcscmp(objectType, L"Plane") == 0)
+		{
+			model->createPlane(x, y, z);
 		}
 		else
 		{
