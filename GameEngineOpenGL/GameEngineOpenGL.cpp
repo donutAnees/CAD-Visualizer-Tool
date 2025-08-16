@@ -471,8 +471,11 @@ INT_PTR CALLBACK PropertiesDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
             const Mesh& mesh = model.meshes[g_selectedMeshIdx];
             
             // Initialize dialog with mesh values
-            // Convert float values to strings and set them in the dialog
-            wchar_t buffer[32];
+            wchar_t buffer[64];
+            
+            // Object identity
+            SetDlgItemTextA(hDlg, IDC_PROP_NAME, mesh.objectName.c_str());
+            SetDlgItemTextA(hDlg, IDC_PROP_TYPE, mesh.objectType.c_str());
             
             // Rotation
             swprintf_s(buffer, L"%.2f", mesh.rotationX);
@@ -489,6 +492,53 @@ INT_PTR CALLBACK PropertiesDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
             SetDlgItemText(hDlg, IDC_PROP_POS_Y, buffer);
             swprintf_s(buffer, L"%.2f", mesh.centerZ);
             SetDlgItemText(hDlg, IDC_PROP_POS_Z, buffer);
+            
+            // Scale - these should now persist
+            swprintf_s(buffer, L"%.2f", mesh.scaleX);
+            SetDlgItemText(hDlg, IDC_PROP_SCALE_X, buffer);
+            swprintf_s(buffer, L"%.2f", mesh.scaleY);
+            SetDlgItemText(hDlg, IDC_PROP_SCALE_Y, buffer);
+            swprintf_s(buffer, L"%.2f", mesh.scaleZ);
+            SetDlgItemText(hDlg, IDC_PROP_SCALE_Z, buffer);
+            
+            // Dimensions (intrinsic size before scaling)
+            swprintf_s(buffer, L"%.2f", mesh.width);
+            SetDlgItemText(hDlg, IDC_PROP_WIDTH, buffer);
+            swprintf_s(buffer, L"%.2f", mesh.height);
+            SetDlgItemText(hDlg, IDC_PROP_HEIGHT, buffer);
+            swprintf_s(buffer, L"%.2f", mesh.depth);
+            SetDlgItemText(hDlg, IDC_PROP_DEPTH, buffer);
+            
+            // Bounding box size information
+            swprintf_s(buffer, L"X: %.2f, Y: %.2f, Z: %.2f", mesh.sizeX, mesh.sizeY, mesh.sizeZ);
+            SetDlgItemText(hDlg, IDC_STATIC + 100, buffer);
+            
+            // Color
+            swprintf_s(buffer, L"%.2f", mesh.colorR);
+            SetDlgItemText(hDlg, IDC_PROP_COLOR_R, buffer);
+            swprintf_s(buffer, L"%.2f", mesh.colorG);
+            SetDlgItemText(hDlg, IDC_PROP_COLOR_G, buffer);
+            swprintf_s(buffer, L"%.2f", mesh.colorB);
+            SetDlgItemText(hDlg, IDC_PROP_COLOR_B, buffer);
+            
+            // Material properties
+            swprintf_s(buffer, L"%.2f", mesh.transparency);
+            SetDlgItemText(hDlg, IDC_PROP_TRANSPARENCY, buffer);
+            swprintf_s(buffer, L"%.2f", mesh.shininess);
+            SetDlgItemText(hDlg, IDC_PROP_SHINY, buffer);
+            
+            // Material types combo box
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_RESETCONTENT, 0, 0); // Clear existing items
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_ADDSTRING, 0, (LPARAM)L"Default");
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_ADDSTRING, 0, (LPARAM)L"Plastic");
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_ADDSTRING, 0, (LPARAM)L"Metal");
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_ADDSTRING, 0, (LPARAM)L"Glass");
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_ADDSTRING, 0, (LPARAM)L"Wood");
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_SETCURSEL, mesh.materialType, 0);
+            
+            // Display options
+            CheckDlgButton(hDlg, IDC_PROP_WIREFRAME, mesh.wireframeMode ? BST_CHECKED : BST_UNCHECKED);
+            CheckDlgButton(hDlg, IDC_PROP_VISIBILITY, mesh.isVisible ? BST_CHECKED : BST_UNCHECKED);
         }
         return (INT_PTR)TRUE;
 
@@ -498,27 +548,87 @@ INT_PTR CALLBACK PropertiesDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
             if (g_selectedMeshIdx >= 0 && g_selectedMeshIdx < (int)model.meshes.size())
             {
                 // Get values from dialog
-                wchar_t buffer[32];
-                float rotX, rotY, rotZ, posX, posY, posZ;
+                wchar_t buffer[64];
                 
+                // Object identity
+                char nameBuffer[64] = {0};
+                GetDlgItemTextA(hDlg, IDC_PROP_NAME, nameBuffer, 64);
+                std::string objectName = nameBuffer;
+                
+                // Transform values
                 // Rotation
-                GetDlgItemText(hDlg, IDC_PROP_ROT_X, buffer, 32);
+                float rotX, rotY, rotZ;
+                GetDlgItemText(hDlg, IDC_PROP_ROT_X, buffer, 64);
                 rotX = (float)_wtof(buffer);
-                GetDlgItemText(hDlg, IDC_PROP_ROT_Y, buffer, 32);
+                GetDlgItemText(hDlg, IDC_PROP_ROT_Y, buffer, 64);
                 rotY = (float)_wtof(buffer);
-                GetDlgItemText(hDlg, IDC_PROP_ROT_Z, buffer, 32);
+                GetDlgItemText(hDlg, IDC_PROP_ROT_Z, buffer, 64);
                 rotZ = (float)_wtof(buffer);
                 
                 // Position
-                GetDlgItemText(hDlg, IDC_PROP_POS_X, buffer, 32);
+                float posX, posY, posZ;
+                GetDlgItemText(hDlg, IDC_PROP_POS_X, buffer, 64);
                 posX = (float)_wtof(buffer);
-                GetDlgItemText(hDlg, IDC_PROP_POS_Y, buffer, 32);
+                GetDlgItemText(hDlg, IDC_PROP_POS_Y, buffer, 64);
                 posY = (float)_wtof(buffer);
-                GetDlgItemText(hDlg, IDC_PROP_POS_Z, buffer, 32);
+                GetDlgItemText(hDlg, IDC_PROP_POS_Z, buffer, 64);
                 posZ = (float)_wtof(buffer);
                 
-                // Update the mesh using the Model's method which will also rebuild the spatial accelerator
-                model.updateMeshProperties(g_selectedMeshIdx, rotX, rotY, rotZ, posX, posY, posZ);
+                // Scale - should now persist between updates
+                float scaleX, scaleY, scaleZ;
+                GetDlgItemText(hDlg, IDC_PROP_SCALE_X, buffer, 64);
+                scaleX = (float)_wtof(buffer);
+                GetDlgItemText(hDlg, IDC_PROP_SCALE_Y, buffer, 64);
+                scaleY = (float)_wtof(buffer);
+                GetDlgItemText(hDlg, IDC_PROP_SCALE_Z, buffer, 64);
+                scaleZ = (float)_wtof(buffer);
+                
+                // Dimensions
+                float width, height, depth;
+                GetDlgItemText(hDlg, IDC_PROP_WIDTH, buffer, 64);
+                width = (float)_wtof(buffer);
+                GetDlgItemText(hDlg, IDC_PROP_HEIGHT, buffer, 64);
+                height = (float)_wtof(buffer);
+                GetDlgItemText(hDlg, IDC_PROP_DEPTH, buffer, 64);
+                depth = (float)_wtof(buffer);
+                
+                // Color
+                float colorR, colorG, colorB;
+                GetDlgItemText(hDlg, IDC_PROP_COLOR_R, buffer, 64);
+                colorR = (float)_wtof(buffer);
+                GetDlgItemText(hDlg, IDC_PROP_COLOR_G, buffer, 64);
+                colorG = (float)_wtof(buffer);
+                GetDlgItemText(hDlg, IDC_PROP_COLOR_B, buffer, 64);
+                colorB = (float)_wtof(buffer);
+                
+                // Material properties
+                float transparency, shininess;
+                GetDlgItemText(hDlg, IDC_PROP_TRANSPARENCY, buffer, 64);
+                transparency = (float)_wtof(buffer);
+                GetDlgItemText(hDlg, IDC_PROP_SHINY, buffer, 64);
+                shininess = (float)_wtof(buffer);
+                
+                int materialType = SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_GETCURSEL, 0, 0);
+                
+                // Display options
+                bool wireframe = (IsDlgButtonChecked(hDlg, IDC_PROP_WIREFRAME) == BST_CHECKED);
+                bool visible = (IsDlgButtonChecked(hDlg, IDC_PROP_VISIBILITY) == BST_CHECKED);
+                
+                // Update the mesh properties
+                Mesh& mesh = model.meshes[g_selectedMeshIdx];
+                mesh.objectName = objectName;
+                
+                // Update all mesh properties using the enhanced Model method
+                model.updateMeshAllProperties(
+                    g_selectedMeshIdx,
+                    rotX, rotY, rotZ,
+                    posX, posY, posZ,
+                    scaleX, scaleY, scaleZ,
+                    width, height, depth,
+                    colorR, colorG, colorB,
+                    transparency, shininess, materialType,
+                    wireframe, visible
+                );
             }
             
             EndDialog(hDlg, LOWORD(wParam));

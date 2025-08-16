@@ -19,7 +19,7 @@ public:
 	Grid grid;
     std::unique_ptr<SpatialAccelerator> accelerator;
     std::unique_ptr<ViewProjMethodGLM> projectionMethod;
-
+    
 	Model() : camera(), grid(camera) {
         // Create the appropriate spatial accelerator based on optimization mode
         accelerator.reset(SpatialAcceleratorFactory::createAccelerator());
@@ -36,25 +36,26 @@ public:
     void buildAccelerator() {
         if (accelerator) {
             accelerator->build(meshes);
-        }
+    }
     }
 
 	// Get Projection Matrix
 	glm::mat4 getProjectionMatrix() const {
 		if (projectionMethod) {
 			return projectionMethod->getComposedProjectionMatrix();
-		}
+        }
 		return glm::mat4(1.0f);	
     }
 
     // Call this whenever screen size or camera mode changes
     void updateProjection(int width, int height) {
+        // Update the aspect ratio based on the window size
         float aspect = float(width) / float(height);
-
+        
         if (camera.mode == PERSPECTIVE_MODE) {
             projectionMethod = std::make_unique<PerspectiveProj>(
                 camera.zoom, aspect, camera.nearPlane, camera.farPlane);
-        }
+    }
         else {
             float orthoZoom = 1.0f / camera.zoom;
             projectionMethod = std::make_unique<OrthoProj>(
@@ -73,7 +74,7 @@ public:
 		glLoadIdentity();
         if (projectionMethod) {
             glm::mat4 proj = projectionMethod->getComposedProjectionMatrix();
-            glLoadMatrixf(glm::value_ptr(proj));
+        glLoadMatrixf(glm::value_ptr(proj));
         }
 
 		// Set Model View Matrix
@@ -107,6 +108,73 @@ public:
             mesh.centerZ = posZ;
             
             // Update the mesh geometry
+            mesh.updateMesh();
+            
+            // Rebuild spatial accelerator because mesh geometry changed
+            buildAccelerator();
+        }
+    }
+    
+    // Comprehensive update of mesh properties including scale, color, etc.
+    void updateMeshAllProperties(int meshIndex, 
+                               float rotX, float rotY, float rotZ,
+                               float posX, float posY, float posZ,
+                               float scaleX, float scaleY, float scaleZ,
+                               float width, float height, float depth,
+                               float colorR, float colorG, float colorB, 
+                               float transparency, float shininess, int materialType,
+                               bool wireframe, bool visible) {
+        if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size())) {
+            Mesh& mesh = meshes[meshIndex];
+            
+            // First, handle color and material changes
+            if (mesh.colorR != colorR || mesh.colorG != colorG || mesh.colorB != colorB) {
+                mesh.colorR = colorR;
+                mesh.colorG = colorG;
+                mesh.colorB = colorB;
+                mesh.updateColors(colorR, colorG, colorB);
+            }
+            
+            // Update material properties
+            mesh.transparency = transparency;
+            mesh.isTransparent = (transparency > 0.01f);
+            mesh.shininess = shininess;
+            mesh.materialType = materialType;
+            
+            // Update display options
+            mesh.wireframeMode = wireframe;
+            mesh.isVisible = visible;
+            
+            // Handle dimension changes - only apply applyScale when dimensions change
+            bool dimensionsChanged = (fabs(mesh.width - width) > 0.001f || 
+                                    fabs(mesh.height - height) > 0.001f || 
+                                    fabs(mesh.depth - depth) > 0.001f);
+            
+            if (dimensionsChanged) {
+                // Update dimensions and calculate proper scale factors
+                mesh.setDimensions(width, height, depth);
+            } else {
+                mesh.applyScale(scaleX, scaleY, scaleZ);
+            }
+            
+            // Update transform properties
+            bool transformChanged = (fabs(mesh.rotationX - rotX) > 0.001f ||
+                                   fabs(mesh.rotationY - rotY) > 0.001f ||
+                                   fabs(mesh.rotationZ - rotZ) > 0.001f ||
+                                   fabs(mesh.centerX - posX) > 0.001f ||
+                                   fabs(mesh.centerY - posY) > 0.001f ||
+                                   fabs(mesh.centerZ - posZ) > 0.001f);
+                                   
+            if (transformChanged) {
+                mesh.rotationX = rotX;
+                mesh.rotationY = rotY;
+                mesh.rotationZ = rotZ;
+                mesh.centerX = posX;
+                mesh.centerY = posY;
+                mesh.centerZ = posZ;
+            }
+            
+            // Always update the mesh to apply all changes
             mesh.updateMesh();
             
             // Rebuild spatial accelerator because mesh geometry changed
@@ -165,6 +233,17 @@ public:
         };
 
 		mesh.init(vertices, colors, indices);
+        
+        // Set cube-specific properties
+        mesh.objectName = "Cube";
+        mesh.objectType = "Cube";
+        mesh.width = size;
+        mesh.height = size;
+        mesh.depth = size;
+        mesh.colorR = 1.0f;
+        mesh.colorG = 0.0f;
+        mesh.colorB = 0.0f;
+        
         meshes.push_back(mesh);
 		buildAccelerator();
     }
@@ -203,6 +282,17 @@ public:
            4, 0, 1
        };
        mesh.init(vertices, colors, indices);
+       
+       // Set pyramid-specific properties
+       mesh.objectName = "Pyramid";
+       mesh.objectType = "Pyramid";
+       mesh.width = size;
+       mesh.height = size;
+       mesh.depth = size;
+       mesh.colorR = 0.0f;
+       mesh.colorG = 1.0f;
+       mesh.colorB = 0.0f;
+       
        meshes.push_back(mesh);
 	   buildAccelerator();
     }

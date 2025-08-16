@@ -61,6 +61,7 @@ public:
     std::vector<glm::vec3> vertices; // Store only the vertices this face needs
 
     // Constructor
+    Face() : v0(0), v1(0), v2(0), centroid(0.0f) {}
     Face(unsigned int v0, unsigned int v1, unsigned int v2,
         std::vector<GLfloat>* sourceVertices)
         : v0(v0), v1(v1), v2(v2)
@@ -151,11 +152,31 @@ public:
 	GLfloat centerX, centerY, centerZ; // Center of the mesh
 	GLfloat sizeX, sizeY, sizeZ; // Size of the mesh in each dimension
 	GLfloat rotationX, rotationY, rotationZ; // Rotation angles in degrees
+    
+    GLfloat scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
+    
+    // These represent the object's intrinsic dimensions before scaling
+    GLfloat width, height, depth;
+    
+    // appearance
+    GLfloat colorR = 1.0f, colorG = 1.0f, colorB = 1.0f; // Color components
+    GLfloat transparency = 0.0f; // 0.0 = opaque, 1.0 = fully transparent
+    GLfloat shininess = 0.0f; // Material shininess/reflectivity (0.0 - 1.0)
+    int materialType = 0; // 0 = default, 1 = plastic, 2 = metal, 3 = glass, etc.
+    
+    // Identity properties
+    std::string objectName = "Object";
+    std::string objectType = "Generic"; // "Cube", "Pyramid", "ImportedMesh", etc.
+    
+    // Display options
+    bool isVisible = true;
+    bool wireframeMode = false;
     bool showBoundingBox = false;
     bool showVertices = false;
     bool isSelected = false; // Flag to indicate if the mesh is selected
     int selectedFaceIndex = -1; // Index of the selected triangle/face
-	// Model Matrix to apply transformations
+	
+    // Model Matrix to apply transformations
 	glm::mat4 modelMatrix = glm::mat4(1.0f); 
 
     // Constructor
@@ -171,6 +192,9 @@ public:
     }
 
     void calculateBounds() {
+        if (transformedVertices.empty()) return;
+        
+        // Start with the first vertex
         minX = transformedVertices[0];
         maxX = transformedVertices[0];
         minY = transformedVertices[1];
@@ -178,6 +202,7 @@ public:
         minZ = transformedVertices[2];
         maxZ = transformedVertices[2];
 
+        // Find the minimum and maximum coordinates
         for (size_t i = 0; i < transformedVertices.size(); i += 3) {
             minX = std::min(minX, transformedVertices[i]);
             maxX = std::max(maxX, transformedVertices[i]);
@@ -187,12 +212,23 @@ public:
             maxZ = std::max(maxZ, transformedVertices[i + 2]);
         }
 
-        // Calculate the size of the object
+        // Calculate the size of the object based on the bounding box
         sizeX = maxX - minX;
         sizeY = maxY - minY;
         sizeZ = maxZ - minZ;
         
-        // Set up the transformed corners as the default corners
+        // Update center based on transformed bounding box
+        centerX = (minX + maxX) / 2.0f;
+        centerY = (minY + maxY) / 2.0f;
+        centerZ = (minZ + maxZ) / 2.0f;
+        
+        // Set base dimensions - these are intrinsic dimensions before scaling
+        // Since we've just applied scaling, we divide by scale factors to get original dimensions
+        width = sizeX / scaleX;
+        height = sizeY / scaleY;
+        depth = sizeZ / scaleZ;
+        
+        // Set up the transformed corners of the bounding box
         glm::vec4 corners[8] = {
 			{minX, minY, minZ, 1.0f}, {maxX, minY, minZ, 1.0f},
 			{maxX, minY, maxZ, 1.0f}, {minX, minY, maxZ, 1.0f},
@@ -203,7 +239,6 @@ public:
         for (int i = 0; i < 8; ++i) {
             transformedBoundingBoxCorners[i] = corners[i];
         }
-
     }
 
     glm::vec3 computeOriginalCenter() {
@@ -224,41 +259,86 @@ public:
         return glm::vec3((minX + maxX) / 2.0f, (minY + maxY) / 2.0f, (minZ + maxZ) / 2.0f);
     }
 
+    void synchronizeFacesAndIndices() {
+        // Ensure indices size is a multiple of 3 (each face needs exactly 3 indices)
+        if (indices.size() % 3 != 0) {
+            size_t properSize = (indices.size() / 3) * 3;
+            indices.resize(properSize);
+        }
+
+        // Rebuild faces from indices, ensuring they match
+        constructFaces();
+
+        // Verify consistency: we should have exactly indices.size()/3 faces
+        size_t expectedFaces = indices.size() / 3;
+        if (faces.size() != expectedFaces) {
+            faces.resize(expectedFaces);
+
+            // If the selected face is now out of bounds, reset selection
+            if (selectedFaceIndex >= static_cast<int>(faces.size())) {
+                selectedFaceIndex = -1;
+            }
+        }
+    }
+
+    // Replace the constructFaces() method with this version:
+
     void constructFaces() {
         faces.clear();
-        for (size_t i = 0; i < indices.size(); i += 3) {
-            faces.emplace_back(indices[i], indices[i + 1], indices[i + 2], &transformedVertices);
-        }
-	}
 
+        // Safety check - make sure we have valid indices
+        if (indices.empty() || indices.size() % 3 != 0) {
+            return;
+        }
+
+        // Safety check - make sure we have valid transformed vertices
+        if (transformedVertices.empty()) {
+            return;
+        }
+
+        // Create faces for each triangle (group of 3 indices)
+        for (size_t i = 0; i + 2 < indices.size(); i += 3) {
+            try {
+                faces.emplace_back(indices[i], indices[i + 1], indices[i + 2], &transformedVertices);
+            }
+            catch (const std::out_of_range&) {
+                // If we got an out of range error, some index is referring to a non-existent vertex
+                // Stop adding faces to prevent further issues
+                OutputDebugString(L"Error in constructFaces(): Face vertex index out of bounds\n");
+                break;
+            }
+        }
+    }
+    
     void init(const std::vector<GLfloat>& vertices, const std::vector<GLfloat>& colors, const std::vector<unsigned int>& indices) {
         if (vertices.size() % 3 != 0) {
             throw std::invalid_argument("Vertices size must be a multiple of 3 (x, y, z components).");
         }
         this->vertices = vertices;
-		this->transformedVertices = vertices; // Initialize transformed vertices with original vertices
-		this->colors = colors;
-		this->indices = indices;
+        this->transformedVertices = vertices; // Initialize transformed vertices with original vertices
+        this->colors = colors;
+        this->indices = indices;
 
-		// Calculate the bounding box
-		calculateBounds();
+        // Ensure indices size is a multiple of 3
+        if (this->indices.size() % 3 != 0) {
+            size_t properSize = (this->indices.size() / 3) * 3;
+            this->indices.resize(properSize);
+        }
 
-        // Calculate the center of the object
-        centerX = (minX + maxX) / 2.0f;
-        centerY = (minY + maxY) / 2.0f;
-        centerZ = (minZ + maxZ) / 2.0f;
-        
-		// Set the rotation angles to 0
-		rotationX = 0.0f;
-		rotationY = 0.0f;
-		rotationZ = 0.0f;
-        
+        // Calculate the bounding box
+        calculateBounds();
+
+        // Set the rotation angles to 0
+        rotationX = 0.0f;
+        rotationY = 0.0f;
+        rotationZ = 0.0f;
+
         // Reset selection state
         isSelected = false;
         selectedFaceIndex = -1;
 
-		// Construct faces from indices
-		constructFaces();
+        // Construct faces from indices
+        synchronizeFacesAndIndices();
     }
 
 	// Set vertices and colors
@@ -284,29 +364,103 @@ public:
         return glm::vec3(sizeX, sizeY, sizeZ);
     }
 
+    // Update color for the entire mesh
+    void updateColors(float r, float g, float b) {
+        colorR = r;
+        colorG = g;
+        colorB = b;
+        
+        for (size_t i = 0; i < colors.size(); i += 3) {
+            colors[i] = r;
+            colors[i + 1] = g;
+            colors[i + 2] = b;
+        }
+    }
+
+    // Apply the scale factors to the mesh
+    void applyScale(float newScaleX, float newScaleY, float newScaleZ) {
+        scaleX = newScaleX;
+        scaleY = newScaleY;
+        scaleZ = newScaleZ;
+        width = (scaleX > 0.001f) ? width * scaleX : width;
+        height = (scaleY > 0.001f) ? height * scaleY : height;
+        depth = (scaleZ > 0.001f) ? depth * scaleZ : depth;
+    }
+    
+    // Set object dimensions (width, height, depth)
+    void setDimensions(float newWidth, float newHeight, float newDepth) {
+        // Only apply if dimensions have actually changed
+        if (fabs(width - newWidth) < 0.001f && 
+            fabs(height - newHeight) < 0.001f && 
+            fabs(depth - newDepth) < 0.001f) {
+            return;
+        }
+        
+        // Calculate scale factors based on current dimensions
+        // Prevent division by zero
+        float newScaleX = (width > 0.001f) ? newWidth / width : 1.0f;
+        float newScaleY = (height > 0.001f) ? newHeight / height : 1.0f;
+        float newScaleZ = (depth > 0.001f) ? newDepth / depth : 1.0f;
+        
+        // Update the intrinsic dimensions
+        width = newWidth;
+        height = newHeight;
+        depth = newDepth;
+        
+        // Set scale factors for the transformation
+        scaleX = newScaleX;
+        scaleY = newScaleY;
+        scaleZ = newScaleZ;
+        
+        // Apply the new scale to the mesh
+        updateMesh();
+    }
+    
+    // Set material properties
+    void setMaterial(float shine, float alpha, int material) {
+        shininess = shine;
+        transparency = alpha;
+        materialType = material;
+        isTransparent = (alpha > 0.01f);
+    }
+
     // Render the mesh
     void draw() const {
+        // Skip rendering if not visible
+        if (!isVisible) return;
+
+        // Safety check: ensure indices are valid for the selected face
+        bool canHighlightFace = isSelected &&
+            selectedFaceIndex >= 0 &&
+            selectedFaceIndex < static_cast<int>(faces.size()) &&
+            selectedFaceIndex * 3 + 2 < indices.size();
+
         glEnableClientState(GL_VERTEX_ARRAY);
         glVertexPointer(3, GL_FLOAT, 0, transformedVertices.data());
 
         // Enable and point to the color array
         glEnableClientState(GL_COLOR_ARRAY);
         glColorPointer(3, GL_FLOAT, 0, colors.data());
-        
-		// If the mesh is transparent, enable blending
+
+        // If the mesh is transparent, enable blending
         if (isTransparent) {
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			glColor4f(1.0f, 1.0f, 1.0f, 0.5f); // Set transparency (alpha = 0.5)
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glColor4f(colorR, colorG, colorB, 1.0f - transparency); // Apply transparency with mesh color
+        }
+
+        // Apply wireframe mode if enabled
+        if (wireframeMode) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         }
 
         // Draw the mesh with highlight for selection if needed
         if (isSelected) {
             // Option 1: Highlight the entire mesh
-            if (selectedFaceIndex < 0) {
+            if (!canHighlightFace) {
                 // Draw mesh with normal colors
                 glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, indices.data());
-                
+
                 // Then draw a wireframe overlay to highlight it
                 glDisableClientState(GL_COLOR_ARRAY);
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -315,16 +469,16 @@ public:
                 glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, indices.data());
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
                 glLineWidth(1.0f);
-            } 
+            }
             // Option 2: Highlight specific triangle
-            else if (selectedFaceIndex >= 0 && selectedFaceIndex < static_cast<int>(faces.size())) {
+            else {
                 // Draw non-selected triangles normally
                 for (int i = 0; i < static_cast<int>(faces.size()); ++i) {
-                    if (i != selectedFaceIndex) {
+                    if (i != selectedFaceIndex && i * 3 + 2 < indices.size()) {
                         glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, &indices[i * 3]);
                     }
                 }
-                
+
                 // Draw the selected triangle with highlight
                 glDisableClientState(GL_COLOR_ARRAY);
                 // Fill with semi-transparent highlight
@@ -332,7 +486,7 @@ public:
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                 glColor4f(1.0f, 0.5f, 0.0f, 0.7f); // Orange highlight with transparency
                 glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, &indices[selectedFaceIndex * 3]);
-                
+
                 // Draw outline
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                 glLineWidth(3.0f);
@@ -342,7 +496,8 @@ public:
                 glLineWidth(1.0f);
                 glDisable(GL_BLEND);
             }
-        } else {
+        }
+        else {
             // Draw normally if not selected
             glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, indices.data());
         }
@@ -350,6 +505,12 @@ public:
         if (isTransparent) {
             glDisable(GL_BLEND);
         }
+
+        // Reset polygon mode if we're in wireframe
+        if (wireframeMode) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
+
         glDisableClientState(GL_VERTEX_ARRAY);
         glDisableClientState(GL_COLOR_ARRAY);
 
@@ -363,8 +524,8 @@ public:
     }
 
     void drawLocalAxis() const {
-        if (vertices.empty()) {
-            return; // No vertices, nothing to draw
+        if (vertices.empty() || !isVisible) {
+            return; // No vertices or not visible, nothing to draw
         }
        
         // Draw the axes
@@ -394,6 +555,24 @@ public:
             std::cerr << "Failed to open STL file: " << filePath << std::endl;
             return false;
         }
+
+        // Extract filename from path for object naming
+        size_t lastSlash = filePath.find_last_of("/\\");
+        size_t lastDot = filePath.find_last_of(".");
+        if (lastSlash == std::string::npos) lastSlash = 0;
+        else lastSlash++; // Skip the slash
+        
+        if (lastDot > lastSlash) {
+            objectName = filePath.substr(lastSlash, lastDot - lastSlash);
+        } else {
+            objectName = filePath.substr(lastSlash);
+        }
+        objectType = "ImportedSTL";
+        
+        // Set default color for imported STL (light gray)
+        colorR = 0.8f;
+        colorG = 0.8f;
+        colorB = 0.8f;
 
         // Read the first 80 bytes to check if it's binary or ASCII
         char header[80];
@@ -442,9 +621,10 @@ public:
                                                static_cast<unsigned int>(baseIndex + 1),
                                                static_cast<unsigned int>(baseIndex + 2) });
 
-                colors.insert(colors.end(), { 1.0f, 1.0f, 1.0f });
-                colors.insert(colors.end(), { 1.0f, 1.0f, 1.0f });
-                colors.insert(colors.end(), { 1.0f, 1.0f, 1.0f });
+                // Use the mesh's color properties
+                colors.insert(colors.end(), { colorR, colorG, colorB });
+                colors.insert(colors.end(), { colorR, colorG, colorB });
+                colors.insert(colors.end(), { colorR, colorG, colorB });
             }
         }
         else {
@@ -470,7 +650,8 @@ public:
                     iss >> vertexKeyword >> x >> y >> z;
 
                     vertices.insert(vertices.end(), { x, y, z });
-                    colors.insert(colors.end(), { 1.0f, 1.0f, 1.0f }); // Default to white
+                    // Use the mesh's color properties
+                    colors.insert(colors.end(), { colorR, colorG, colorB });
                 }
                 else if (line.find("endfacet") != std::string::npos) {
                     indices.insert(indices.end(), { static_cast<unsigned int>(baseIndex),
@@ -482,8 +663,15 @@ public:
         }
 
         file.close();
-
+        
+        // Set dimensions based on the bounding box of the loaded model
         init(vertices, colors, indices);
+        
+        // Imported STL objects should have their dimensions set based on the bounding box
+        width = sizeX;
+        height = sizeY;
+        depth = sizeZ;
+        
         return true;
     }
 
@@ -501,18 +689,18 @@ public:
         glm::mat4 rotY = glm::rotate(glm::mat4(1.0f), ry, glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 rotZ = glm::rotate(glm::mat4(1.0f), rz, glm::vec3(0.0f, 0.0f, 1.0f));
 
-        // Combine rotations
+        // Combine transformations - first scale, then rotate
         glm::mat4 rotationMatrix = rotZ * rotY * rotX;
+        glm::mat4 scaleMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(scaleX, scaleY, scaleZ));
 
+        // Rotation must happen around the center of the object
+        glm::vec3 origCenter = computeOriginalCenter();
         modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(centerX, centerY, centerZ)) *
-                                rotationMatrix *
-			// Rotation must happen around the center of the object
-			// Since the object is centered at X,Y,Z, we first convert it to 0,0,0
-			// Then we rotate it, and finally move it back to the original position
-            glm::translate(glm::mat4(1.0f), -computeOriginalCenter());
+            rotationMatrix * scaleMatrix *
+            glm::translate(glm::mat4(1.0f), -origCenter);
 
-        glm::vec3 center(centerX, centerY, centerZ);
-        
+        // Transform vertices but keep original vertices untouched
+        transformedVertices.resize(vertices.size());
         for (size_t i = 0; i < vertices.size(); i += 3) {
             glm::vec4 vertex = glm::vec4(vertices[i], vertices[i + 1], vertices[i + 2], 1.0f);
             glm::vec4 transformed = modelMatrix * vertex;
@@ -522,13 +710,30 @@ public:
             transformedVertices[i + 2] = transformed.z;
         }
 
-        // Update the bounding box
+        // Get local space bounds for bounding box visualization
+        float localMinX = vertices[0], localMaxX = vertices[0];
+        float localMinY = vertices[1], localMaxY = vertices[1];
+        float localMinZ = vertices[2], localMaxZ = vertices[2];
+
+        for (size_t i = 0; i < vertices.size(); i += 3) {
+            localMinX = std::min(localMinX, vertices[i]);
+            localMaxX = std::max(localMaxX, vertices[i]);
+            localMinY = std::min(localMinY, vertices[i + 1]);
+            localMaxY = std::max(localMaxY, vertices[i + 1]);
+            localMinZ = std::min(localMinZ, vertices[i + 2]);
+            localMaxZ = std::max(localMaxZ, vertices[i + 2]);
+        }
+
         // Define the 8 corners of the bounding box in local space
         glm::vec4 corners[8] = {
-            {minX, minY, minZ, 1.0f}, {maxX, minY, minZ, 1.0f},
-            {maxX, minY, maxZ, 1.0f}, {minX, minY, maxZ, 1.0f},
-            {minX, maxY, minZ, 1.0f}, {maxX, maxY, minZ, 1.0f},
-            {maxX, maxY, maxZ, 1.0f}, {minX, maxY, maxZ, 1.0f}
+            {localMinX, localMinY, localMinZ, 1.0f},
+            {localMaxX, localMinY, localMinZ, 1.0f},
+            {localMaxX, localMinY, localMaxZ, 1.0f},
+            {localMinX, localMinY, localMaxZ, 1.0f},
+            {localMinX, localMaxY, localMinZ, 1.0f},
+            {localMaxX, localMaxY, localMinZ, 1.0f},
+            {localMaxX, localMaxY, localMaxZ, 1.0f},
+            {localMinX, localMaxY, localMaxZ, 1.0f}
         };
 
         // Transform the corners and store them
@@ -536,13 +741,37 @@ public:
             transformedBoundingBoxCorners[i] = modelMatrix * corners[i];
         }
 
-        // Reconstruct the faces
-        constructFaces();
+        // Recalculate bounds from transformed vertices
+        if (!transformedVertices.empty()) {
+            minX = transformedVertices[0];
+            maxX = transformedVertices[0];
+            minY = transformedVertices[1];
+            maxY = transformedVertices[1];
+            minZ = transformedVertices[2];
+            maxZ = transformedVertices[2];
+
+            for (size_t i = 0; i < transformedVertices.size(); i += 3) {
+                minX = std::min(minX, transformedVertices[i]);
+                maxX = std::max(maxX, transformedVertices[i]);
+                minY = std::min(minY, transformedVertices[i + 1]);
+                maxY = std::max(maxY, transformedVertices[i + 1]);
+                minZ = std::min(minZ, transformedVertices[i + 2]);
+                maxZ = std::max(maxZ, transformedVertices[i + 2]);
+            }
+
+            // Update the size of the object based on the transformed vertices
+            sizeX = maxX - minX;
+            sizeY = maxY - minY;
+            sizeZ = maxZ - minZ;
+        }
+
+        // Ensure faces and indices are synchronized
+        synchronizeFacesAndIndices();
     }
 
     // Draws points at each vertex of the mesh
     void drawVertices() const {
-        if (transformedVertices.empty()) return;
+        if (transformedVertices.empty() || !isVisible) return;
 
         glPointSize(5.0f);
         glBegin(GL_POINTS);
@@ -557,7 +786,7 @@ public:
 
     // Draws a wireframe bounding box around the mesh
     void drawBoundingBox() const {
-        if (transformedVertices.empty()) return;
+        if (transformedVertices.empty() || !isVisible) return;
 
         // Draw the bounding box using the transformed corners
         glColor3f(1.0f, 1.0f, 0.0f); // Yellow color
@@ -612,6 +841,14 @@ public:
     void toggleVertices() {
         showVertices = !showVertices;
     }
+    
+    void toggleWireframe() {
+        wireframeMode = !wireframeMode;
+    }
+    
+    void toggleVisibility() {
+        isVisible = !isVisible;
+    }
 
     // Set or clear the selected state
     void setSelected(bool selected) {
@@ -623,8 +860,12 @@ public:
 
     // Select a specific face/triangle
     void selectFace(int faceIndex) {
-        if (faceIndex >= 0 && faceIndex < static_cast<int>(faces.size())) {
+        if (faceIndex >= 0 && faceIndex < static_cast<int>(faces.size()) &&
+            faceIndex * 3 + 2 < indices.size()) {
             selectedFaceIndex = faceIndex;
+        }
+        else {
+            selectedFaceIndex = -1; // Invalid face index
         }
     }
 
