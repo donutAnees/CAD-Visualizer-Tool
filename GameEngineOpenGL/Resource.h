@@ -34,9 +34,6 @@
 #define IDC_PROP_SCALE_X                1036
 #define IDC_PROP_SCALE_Y                1037
 #define IDC_PROP_SCALE_Z                1038
-#define IDC_PROP_WIDTH                  1039
-#define IDC_PROP_HEIGHT                 1040
-#define IDC_PROP_DEPTH                  1041
 #define IDC_PROP_COLOR_R                1042
 #define IDC_PROP_COLOR_G                1043
 #define IDC_PROP_COLOR_B                1044
@@ -47,6 +44,7 @@
 #define IDC_PROP_TYPE                   1049
 #define IDC_PROP_VISIBILITY             1050
 #define IDC_PROP_WIREFRAME              1051
+#define IDC_BOUNDING_BOX_SIZE           1052
 #define IDM_VIEW_ORTHO                  32771
 #define IDM_VIEW_PERSP                  32772
 #define IDM_OBJECT                      32773

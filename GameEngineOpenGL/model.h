@@ -126,7 +126,6 @@ public:
                                float rotX, float rotY, float rotZ,
                                float posX, float posY, float posZ,
                                float scaleX, float scaleY, float scaleZ,
-                               float width, float height, float depth,
                                float colorR, float colorG, float colorB, 
                                float transparency, float shininess, int materialType,
                                bool wireframe, bool visible) {
@@ -151,17 +150,8 @@ public:
             mesh.wireframeMode = wireframe;
             mesh.isVisible = visible;
             
-            // Handle dimension changes - only apply applyScale when dimensions change
-            bool dimensionsChanged = (fabs(mesh.width - width) > 0.001f || 
-                                    fabs(mesh.height - height) > 0.001f || 
-                                    fabs(mesh.depth - depth) > 0.001f);
-            
-            if (dimensionsChanged) {
-                // Update dimensions and calculate proper scale factors
-                mesh.setDimensions(width, height, depth);
-            } else {
-                mesh.applyScale(scaleX, scaleY, scaleZ);
-            }
+            // Apply scale
+            mesh.applyScale(scaleX, scaleY, scaleZ);
             
             // Update transform properties
             bool transformChanged = (fabs(mesh.rotationX - rotX) > 0.001f ||
@@ -243,9 +233,6 @@ public:
         // Set cube-specific properties
         mesh.objectName = "Cube";
         mesh.objectType = "Cube";
-        mesh.width = size;
-        mesh.height = size;
-        mesh.depth = size;
         mesh.colorR = 1.0f;
         mesh.colorG = 0.0f;
         mesh.colorB = 0.0f;
@@ -292,9 +279,6 @@ public:
        // Set pyramid-specific properties
        mesh.objectName = "Pyramid";
        mesh.objectType = "Pyramid";
-       mesh.width = size;
-       mesh.height = size;
-       mesh.depth = size;
        mesh.colorR = 0.0f;
        mesh.colorG = 1.0f;
        mesh.colorB = 0.0f;

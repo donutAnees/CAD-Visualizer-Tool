@@ -155,9 +155,6 @@ public:
     
     GLfloat scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
     
-    // These represent the object's intrinsic dimensions before scaling
-    GLfloat width, height, depth;
-    
     // appearance
     GLfloat colorR = 1.0f, colorG = 1.0f, colorB = 1.0f; // Color components
     GLfloat transparency = 0.0f; // 0.0 = opaque, 1.0 = fully transparent
@@ -203,7 +200,7 @@ public:
         maxZ = transformedVertices[2];
 
         // Find the minimum and maximum coordinates
-        for (size_t i = 0; i < transformedVertices.size(); i += 3) {
+        for (size_t i = 3; i < transformedVertices.size(); i += 3) {
             minX = std::min(minX, transformedVertices[i]);
             maxX = std::max(maxX, transformedVertices[i]);
             minY = std::min(minY, transformedVertices[i + 1]);
@@ -212,23 +209,18 @@ public:
             maxZ = std::max(maxZ, transformedVertices[i + 2]);
         }
 
-        // Calculate the size of the object based on the bounding box
+        // Calculate the size and center of the object based on the bounding box
         sizeX = maxX - minX;
         sizeY = maxY - minY;
         sizeZ = maxZ - minZ;
         
-        // Update center based on transformed bounding box
         centerX = (minX + maxX) / 2.0f;
         centerY = (minY + maxY) / 2.0f;
         centerZ = (minZ + maxZ) / 2.0f;
-        
-        // Set base dimensions - these are intrinsic dimensions before scaling
-        // Since we've just applied scaling, we divide by scale factors to get original dimensions
-        width = sizeX / scaleX;
-        height = sizeY / scaleY;
-        depth = sizeZ / scaleZ;
-        
-        // Set up the transformed corners of the bounding box
+    }
+
+    void calculateBoundingBoxCorners() {
+        // Set up the transformed corners of the bounding box using current bounds
         glm::vec4 corners[8] = {
 			{minX, minY, minZ, 1.0f}, {maxX, minY, minZ, 1.0f},
 			{maxX, minY, maxZ, 1.0f}, {minX, minY, maxZ, 1.0f},
@@ -241,6 +233,28 @@ public:
         }
     }
 
+    void calculateTransformedBoundingBoxCorners(const glm::mat4& modelMatrix, 
+                                              float localMinX, float localMaxX,
+                                              float localMinY, float localMaxY, 
+                                              float localMinZ, float localMaxZ) {
+        // Define the 8 corners of the bounding box in local space
+        glm::vec4 corners[8] = {
+            {localMinX, localMinY, localMinZ, 1.0f},
+            {localMaxX, localMinY, localMinZ, 1.0f},
+            {localMaxX, localMinY, localMaxZ, 1.0f},
+            {localMinX, localMinY, localMaxZ, 1.0f},
+            {localMinX, localMaxY, localMinZ, 1.0f},
+            {localMaxX, localMaxY, localMinZ, 1.0f},
+            {localMaxX, localMaxY, localMaxZ, 1.0f},
+            {localMinX, localMaxY, localMaxZ, 1.0f}
+        };
+
+        // Transform the corners and store them
+        for (int i = 0; i < 8; ++i) {
+            transformedBoundingBoxCorners[i] = modelMatrix * corners[i];
+        }
+    }
+    
     glm::vec3 computeOriginalCenter() {
         float minX = vertices[0], maxX = vertices[0];
         float minY = vertices[1], maxY = vertices[1];
@@ -325,8 +339,9 @@ public:
             this->indices.resize(properSize);
         }
 
-        // Calculate the bounding box
+        // Calculate the bounding box and corners
         calculateBounds();
+        calculateBoundingBoxCorners();
 
         // Set the rotation angles to 0
         rotationX = 0.0f;
@@ -382,38 +397,6 @@ public:
         scaleX = newScaleX;
         scaleY = newScaleY;
         scaleZ = newScaleZ;
-        width = (scaleX > 0.001f) ? width * scaleX : width;
-        height = (scaleY > 0.001f) ? height * scaleY : height;
-        depth = (scaleZ > 0.001f) ? depth * scaleZ : depth;
-    }
-    
-    // Set object dimensions (width, height, depth)
-    void setDimensions(float newWidth, float newHeight, float newDepth) {
-        // Only apply if dimensions have actually changed
-        if (fabs(width - newWidth) < 0.001f && 
-            fabs(height - newHeight) < 0.001f && 
-            fabs(depth - newDepth) < 0.001f) {
-            return;
-        }
-        
-        // Calculate scale factors based on current dimensions
-        // Prevent division by zero
-        float newScaleX = (width > 0.001f) ? newWidth / width : 1.0f;
-        float newScaleY = (height > 0.001f) ? newHeight / height : 1.0f;
-        float newScaleZ = (depth > 0.001f) ? newDepth / depth : 1.0f;
-        
-        // Update the intrinsic dimensions
-        width = newWidth;
-        height = newHeight;
-        depth = newDepth;
-        
-        // Set scale factors for the transformation
-        scaleX = newScaleX;
-        scaleY = newScaleY;
-        scaleZ = newScaleZ;
-        
-        // Apply the new scale to the mesh
-        updateMesh();
     }
     
     // Set material properties
@@ -667,11 +650,6 @@ public:
         // Set dimensions based on the bounding box of the loaded model
         init(vertices, colors, indices);
         
-        // Imported STL objects should have their dimensions set based on the bounding box
-        width = sizeX;
-        height = sizeY;
-        depth = sizeZ;
-        
         return true;
     }
 
@@ -715,7 +693,7 @@ public:
         float localMinY = vertices[1], localMaxY = vertices[1];
         float localMinZ = vertices[2], localMaxZ = vertices[2];
 
-        for (size_t i = 0; i < vertices.size(); i += 3) {
+        for (size_t i = 3; i < vertices.size(); i += 3) {
             localMinX = std::min(localMinX, vertices[i]);
             localMaxX = std::max(localMaxX, vertices[i]);
             localMinY = std::min(localMinY, vertices[i + 1]);
@@ -724,46 +702,12 @@ public:
             localMaxZ = std::max(localMaxZ, vertices[i + 2]);
         }
 
-        // Define the 8 corners of the bounding box in local space
-        glm::vec4 corners[8] = {
-            {localMinX, localMinY, localMinZ, 1.0f},
-            {localMaxX, localMinY, localMinZ, 1.0f},
-            {localMaxX, localMinY, localMaxZ, 1.0f},
-            {localMinX, localMinY, localMaxZ, 1.0f},
-            {localMinX, localMaxY, localMinZ, 1.0f},
-            {localMaxX, localMaxY, localMinZ, 1.0f},
-            {localMaxX, localMaxY, localMaxZ, 1.0f},
-            {localMinX, localMaxY, localMaxZ, 1.0f}
-        };
+        // Calculate transformed bounding box corners from local space bounds
+        calculateTransformedBoundingBoxCorners(modelMatrix, localMinX, localMaxX, 
+                                             localMinY, localMaxY, localMinZ, localMaxZ);
 
-        // Transform the corners and store them
-        for (int i = 0; i < 8; ++i) {
-            transformedBoundingBoxCorners[i] = modelMatrix * corners[i];
-        }
-
-        // Recalculate bounds from transformed vertices
-        if (!transformedVertices.empty()) {
-            minX = transformedVertices[0];
-            maxX = transformedVertices[0];
-            minY = transformedVertices[1];
-            maxY = transformedVertices[1];
-            minZ = transformedVertices[2];
-            maxZ = transformedVertices[2];
-
-            for (size_t i = 0; i < transformedVertices.size(); i += 3) {
-                minX = std::min(minX, transformedVertices[i]);
-                maxX = std::max(maxX, transformedVertices[i]);
-                minY = std::min(minY, transformedVertices[i + 1]);
-                maxY = std::max(maxY, transformedVertices[i + 1]);
-                minZ = std::min(minZ, transformedVertices[i + 2]);
-                maxZ = std::max(maxZ, transformedVertices[i + 2]);
-            }
-
-            // Update the size of the object based on the transformed vertices
-            sizeX = maxX - minX;
-            sizeY = maxY - minY;
-            sizeZ = maxZ - minZ;
-        }
+        // Recalculate bounds from transformed vertices using the refactored method
+        calculateBounds();
 
         // Ensure faces and indices are synchronized
         synchronizeFacesAndIndices();

@@ -532,17 +532,9 @@ INT_PTR CALLBACK PropertiesDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
             swprintf_s(buffer, L"%.2f", mesh.scaleZ);
             SetDlgItemText(hDlg, IDC_PROP_SCALE_Z, buffer);
             
-            // Dimensions (intrinsic size before scaling)
-            swprintf_s(buffer, L"%.2f", mesh.width);
-            SetDlgItemText(hDlg, IDC_PROP_WIDTH, buffer);
-            swprintf_s(buffer, L"%.2f", mesh.height);
-            SetDlgItemText(hDlg, IDC_PROP_HEIGHT, buffer);
-            swprintf_s(buffer, L"%.2f", mesh.depth);
-            SetDlgItemText(hDlg, IDC_PROP_DEPTH, buffer);
-            
             // Bounding box size information
             swprintf_s(buffer, L"X: %.2f, Y: %.2f, Z: %.2f", mesh.sizeX, mesh.sizeY, mesh.sizeZ);
-            SetDlgItemText(hDlg, IDC_STATIC + 100, buffer);
+            SetDlgItemText(hDlg, IDC_BOUNDING_BOX_SIZE, buffer);
             
             // Color
             swprintf_s(buffer, L"%.2f", mesh.colorR);
@@ -614,15 +606,6 @@ INT_PTR CALLBACK PropertiesDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
                 GetDlgItemText(hDlg, IDC_PROP_SCALE_Z, buffer, 64);
                 scaleZ = (float)_wtof(buffer);
                 
-                // Dimensions
-                float width, height, depth;
-                GetDlgItemText(hDlg, IDC_PROP_WIDTH, buffer, 64);
-                width = (float)_wtof(buffer);
-                GetDlgItemText(hDlg, IDC_PROP_HEIGHT, buffer, 64);
-                height = (float)_wtof(buffer);
-                GetDlgItemText(hDlg, IDC_PROP_DEPTH, buffer, 64);
-                depth = (float)_wtof(buffer);
-                
                 // Color
                 float colorR, colorG, colorB;
                 GetDlgItemText(hDlg, IDC_PROP_COLOR_R, buffer, 64);
@@ -655,7 +638,6 @@ INT_PTR CALLBACK PropertiesDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
                     rotX, rotY, rotZ,
                     posX, posY, posZ,
                     scaleX, scaleY, scaleZ,
-                    width, height, depth,
                     colorR, colorG, colorB,
                     transparency, shininess, materialType,
                     wireframe, visible
