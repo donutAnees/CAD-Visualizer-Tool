@@ -533,7 +533,8 @@ INT_PTR CALLBACK PropertiesDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
             SetDlgItemText(hDlg, IDC_PROP_SCALE_Z, buffer);
             
             // Bounding box size information
-            swprintf_s(buffer, L"X: %.2f, Y: %.2f, Z: %.2f", mesh.sizeX, mesh.sizeY, mesh.sizeZ);
+            glm::vec3 boundingBoxSize = mesh.getTightDimensions();
+            swprintf_s(buffer, L"X: %.2f, Y: %.2f, Z: %.2f", boundingBoxSize.x, boundingBoxSize.y, boundingBoxSize.z);
             SetDlgItemText(hDlg, IDC_BOUNDING_BOX_SIZE, buffer);
             
             // Color
