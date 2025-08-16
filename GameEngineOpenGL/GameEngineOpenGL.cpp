@@ -332,8 +332,26 @@ void GetSelectedIndices(int x, int y, int& outMeshIndex, int& outFaceIndex) {
     glm::vec3 rayOrigin, rayDir;
     controller.screenPointToRay(x, y, width, height, viewMatrix, projMatrix, model.camera, rayOrigin, rayDir);
 
-    // Create ray and find intersections
-    Ray ray(rayOrigin, rayDir, 0.0f, 100.0f);
+    // Set appropriate ray range based on camera mode
+    float tMin = 0.0f;
+    float tMax = std::numeric_limits<float>::max();
+    
+    // For orthographic mode, use a large ray range since we could have objects in negative space
+    if (model.camera.mode == ORTHOGRAPHIC_MODE) {
+        tMin = -std::numeric_limits<float>::max(); // Allow intersections behind the ray origin
+        tMax = std::numeric_limits<float>::max();
+    }
+    
+    // Create ray with proper parameters
+    Ray ray(rayOrigin, rayDir, tMin, tMax);
+    
+    // Debug output
+    std::wstringstream ss;
+    ss << L"[GetSelectedIndices] Ray: Origin (" << rayOrigin.x << ", " << rayOrigin.y << ", " << rayOrigin.z 
+       << ") Dir (" << rayDir.x << ", " << rayDir.y << ", " << rayDir.z 
+       << ") tMin: " << tMin << " tMax: " << tMax << "\n";
+    OutputDebugString(ss.str().c_str());
+    
     controller.findRayIntersection(ray, outMeshIndex, outFaceIndex);
 }
 
@@ -354,8 +372,17 @@ LRESULT CALLBACK ChildWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
         g_clickPoint.x = LOWORD(lParam);
         g_clickPoint.y = HIWORD(lParam);
         
+        OutputDebugString(L"WM_RBUTTONDOWN event received\n");
+        
         // Determine which mesh (if any) is at the click position
         GetSelectedIndices(g_clickPoint.x, g_clickPoint.y, g_selectedMeshIdx, g_selectedFaceIdx);
+        
+        // Debug output
+        std::wstringstream ss;
+        ss << L"Right-click detected at (" << g_clickPoint.x << ", " << g_clickPoint.y 
+           << "), selected mesh index: " << g_selectedMeshIdx 
+           << ", selected face index: " << g_selectedFaceIdx << "\n";
+        OutputDebugString(ss.str().c_str());
         
         // Only show context menu if an object was clicked
         if (g_selectedMeshIdx >= 0) {
@@ -370,7 +397,11 @@ LRESULT CALLBACK ChildWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
                 TrackPopupMenu(hSubMenu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, 
                               pt.x, pt.y, 0, GetParent(hWnd), NULL);
                 DestroyMenu(hMenu);
+            } else {
+                OutputDebugString(L"Failed to load context menu resource\n");
             }
+        } else {
+            OutputDebugString(L"No object selected, context menu not shown\n");
         }
     }
         break;

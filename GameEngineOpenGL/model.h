@@ -55,13 +55,19 @@ public:
         if (camera.mode == PERSPECTIVE_MODE) {
             projectionMethod = std::make_unique<PerspectiveProj>(
                 camera.zoom, aspect, camera.nearPlane, camera.farPlane);
-    }
+        }
         else {
             float orthoZoom = 1.0f / camera.zoom;
+            
+            // For orthographic projection, we need to ensure the near and far planes 
+            // are set appropriately to prevent depth clipping issues
+            float nearOrtho = -camera.farPlane;  // Use a negative near plane for orthographic to ensure objects aren't clipped
+            float farOrtho = camera.farPlane;    // Keep far plane the same
+            
             projectionMethod = std::make_unique<OrthoProj>(
                 -aspect * orthoZoom, aspect * orthoZoom,
                 -orthoZoom, orthoZoom,
-                camera.nearPlane, camera.farPlane);
+                nearOrtho, farOrtho);
         }
     }
 

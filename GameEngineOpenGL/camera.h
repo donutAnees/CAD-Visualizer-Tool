@@ -95,11 +95,19 @@ public:
 	}
 
 	void setCameraMode(unsigned int mode) {
+		if (this->mode == mode) return;  // No change needed
+		
 		if (mode == ORTHOGRAPHIC_MODE) {
 			zoom = 1.0f;
+			// When switching to orthographic, adjust near/far planes to allow wider viewing range
+			nearPlane = -FAR_PLANE;  // Negative near plane ensures objects in front are visible
+			farPlane = FAR_PLANE;
 		}
 		else if (mode == PERSPECTIVE_MODE) {
-			zoom = FOV; 
+			zoom = FOV;
+			// Reset to default perspective near/far planes
+			nearPlane = NEAR_PLANE;
+			farPlane = FAR_PLANE;
 		}
 		this->mode = mode;
 	}
@@ -169,11 +177,11 @@ public:
 		}
 	}
 
-	glm::vec3 getPosition() {
+	glm::vec3 getPosition() const {
 		return position;
 	}
 
-	bool isOrbitMode() {
+	bool isOrbitMode() const {
 		return orbitMode;
 	}
 
@@ -296,6 +304,8 @@ public:
 			}
 			// Set zoom so the object fits
 			zoom = 2.0f / std::max(viewWidth, viewHeight); 
+			
+			// Center position on the object
 			position = center; 
 			updateFreeCameraViewMatrix();
 		}
@@ -307,11 +317,11 @@ public:
 
 			float distanceY = radius / tan(fovY / 2.0f);
 			float distanceX = radius / tan(fovX / 2.0f);
-			float distance = std::max(distanceY, distanceX);
-
+			float distance = std::max(distanceY, distanceX) * 1.1f; // Add some margin
+			
 			// Place the camera at the required distance from the center, looking at the center
 			if (orbitMode) {
-				//orbitTarget = center;
+				orbitTarget = center;
 				orbitDistance = distance;
 				updateOrbitCameraViewMatrix();
 			}
