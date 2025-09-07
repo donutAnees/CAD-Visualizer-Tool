@@ -82,7 +82,6 @@ public:
 			model->camera.move(RIGHT, 0.01f);
 			break;
 		case VK_ESCAPE:
-			loopThreadFlag = false;
 			break;
 		default:
 			break;
@@ -128,8 +127,10 @@ public:
 		float y = 1.0f - (2.0f * mouseY) / screenHeight;
 
 		if (camera.mode == ORTHOGRAPHIC_MODE) {
-			glm::vec4 nearPoint(x, y, -1.0f, 1.0f);
-			glm::vec4 farPoint(x, y, 1.0f, 1.0f);
+			// In orthographic mode, we need to use the camera's actual near and far planes
+			// instead of the fixed -1.0 and 1.0 normalized device coordinates
+			glm::vec4 nearPoint(x, y, -1.0f, 1.0f); // Using NDC z = -1 for near plane
+			glm::vec4 farPoint(x, y, 1.0f, 1.0f);   // Using NDC z = 1 for far plane
 
 			// Convert to world space
 			glm::mat4 invViewProj = glm::inverse(projection * view);
@@ -143,6 +144,12 @@ public:
 			// Calculate ray origin and direction
 			outOrigin = glm::vec3(nearWorldPoint);
 			outDir = glm::normalize(glm::vec3(farWorldPoint) - glm::vec3(nearWorldPoint));
+			
+			// Debug output for ray picking
+			std::wstringstream ss;
+			ss << L"[Ortho Ray] Origin: (" << outOrigin.x << ", " << outOrigin.y << ", " << outOrigin.z 
+			   << ") Dir: (" << outDir.x << ", " << outDir.y << ", " << outDir.z << ")\n";
+			OutputDebugString(ss.str().c_str());
 		}
 		else {
 			// Perspective projection
@@ -156,8 +163,14 @@ public:
 			glm::vec3 rayWorld = glm::normalize(glm::vec3(glm::inverse(view) * rayEye));
 
 			// Camera position as ray origin
-			outOrigin = model->camera.getPosition();
+			outOrigin = camera.getPosition();
 			outDir = rayWorld;
+			
+			// Debug output for ray picking
+			std::wstringstream ss;
+			ss << L"[Persp Ray] Origin: (" << outOrigin.x << ", " << outOrigin.y << ", " << outOrigin.z 
+			   << ") Dir: (" << outDir.x << ", " << outDir.y << ", " << outDir.z << ")\n";
+			OutputDebugString(ss.str().c_str());
 		}
 	}
 	
@@ -178,7 +191,18 @@ public:
 		// 3. Perform ray test to find intersections and track both mesh and face indices
 		int meshIndex = -1;
 		int faceIndex = -1;
-		Ray ray(rayOrigin, rayDir, 0.0f, 100.0f);
+		
+		// Set appropriate ray range based on camera mode
+		float tMin = 0.0f;
+		float tMax = std::numeric_limits<float>::max();
+		
+		// For orthographic mode, use a large ray range since we could have objects in negative space
+		if (model->camera.mode == ORTHOGRAPHIC_MODE) {
+			tMin = -std::numeric_limits<float>::max(); // Allow intersections behind the ray origin
+			tMax = std::numeric_limits<float>::max();
+		}
+		
+		Ray ray(rayOrigin, rayDir, tMin, tMax);
 		findRayIntersection(ray, meshIndex, faceIndex);
         
         // 4. Selection logic:
@@ -225,14 +249,38 @@ public:
 	    }
 	}
 
-	void createDialogHandle(wchar_t* objectType, int x, int y, int z, int size) {
+	void createDialogHandle(wchar_t* objectType, int x, int y, int z) {
 		if (wcscmp(objectType, L"Cube") == 0)
 		{
-			model->createCube(x, y, z, size);
+			model->createCube(x, y, z);
 		}
 		else if (wcscmp(objectType, L"Pyramid") == 0)
 		{
-			model->createPyramid(x, y, z, size);
+			model->createPyramid(x, y, z);
+		}
+		else if (wcscmp(objectType, L"Circle") == 0)
+		{
+			model->createCircle(x, y, z);
+		}
+		else if (wcscmp(objectType, L"Cylinder") == 0)
+		{
+			model->createCylinder(x, y, z);
+		}
+		else if (wcscmp(objectType, L"Sphere") == 0)
+		{
+			model->createSphere(x, y, z);
+		}
+		else if (wcscmp(objectType, L"Cone") == 0)
+		{
+			model->createCone(x, y, z);
+		}
+		else if (wcscmp(objectType, L"Torus") == 0)
+		{
+			model->createTorus(x, y, z);
+		}
+		else if (wcscmp(objectType, L"Plane") == 0)
+		{
+			model->createPlane(x, y, z);
 		}
 		else
 		{
@@ -384,7 +432,17 @@ public:
 
 	// Returns the index of the intersected mesh, or -1 if no intersection
 	int testRayIntersections(float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
-		Ray ray(glm::vec3(originX, originY, originZ), glm::vec3(dirX, dirY, dirZ), 0.0f, 100.0f);
+		// Set appropriate ray range based on camera mode
+		float tMin = 0.0f;
+		float tMax = std::numeric_limits<float>::max();
+		
+		// For orthographic mode, use a large ray range since we could have objects in negative space
+		if (model->camera.mode == ORTHOGRAPHIC_MODE) {
+			tMin = -std::numeric_limits<float>::max(); // Allow intersections behind the ray origin
+			tMax = std::numeric_limits<float>::max();
+		}
+		
+		Ray ray(glm::vec3(originX, originY, originZ), glm::vec3(dirX, dirY, dirZ), tMin, tMax);
 
 		int meshIndex, faceIndex;
 		findRayIntersection(ray, meshIndex, faceIndex);

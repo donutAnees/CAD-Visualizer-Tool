@@ -31,6 +31,20 @@
 #define IDC_PROP_POS_X                  1033
 #define IDC_PROP_POS_Y                  1034
 #define IDC_PROP_POS_Z                  1035
+#define IDC_PROP_SCALE_X                1036
+#define IDC_PROP_SCALE_Y                1037
+#define IDC_PROP_SCALE_Z                1038
+#define IDC_PROP_COLOR_R                1042
+#define IDC_PROP_COLOR_G                1043
+#define IDC_PROP_COLOR_B                1044
+#define IDC_PROP_TRANSPARENCY           1045
+#define IDC_PROP_SHINY                  1046
+#define IDC_PROP_MATERIAL               1047
+#define IDC_PROP_NAME                   1048
+#define IDC_PROP_TYPE                   1049
+#define IDC_PROP_VISIBILITY             1050
+#define IDC_PROP_WIREFRAME              1051
+#define IDC_BOUNDING_BOX_SIZE           1052
 #define IDM_VIEW_ORTHO                  32771
 #define IDM_VIEW_PERSP                  32772
 #define IDM_OBJECT                      32773
@@ -50,7 +64,7 @@
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        151
 #define _APS_NEXT_COMMAND_VALUE         32786
-#define _APS_NEXT_CONTROL_VALUE         1036
+#define _APS_NEXT_CONTROL_VALUE         1052
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif

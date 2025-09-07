@@ -332,8 +332,26 @@ void GetSelectedIndices(int x, int y, int& outMeshIndex, int& outFaceIndex) {
     glm::vec3 rayOrigin, rayDir;
     controller.screenPointToRay(x, y, width, height, viewMatrix, projMatrix, model.camera, rayOrigin, rayDir);
 
-    // Create ray and find intersections
-    Ray ray(rayOrigin, rayDir, 0.0f, 100.0f);
+    // Set appropriate ray range based on camera mode
+    float tMin = 0.0f;
+    float tMax = std::numeric_limits<float>::max();
+    
+    // For orthographic mode, use a large ray range since we could have objects in negative space
+    if (model.camera.mode == ORTHOGRAPHIC_MODE) {
+        tMin = -std::numeric_limits<float>::max(); // Allow intersections behind the ray origin
+        tMax = std::numeric_limits<float>::max();
+    }
+    
+    // Create ray with proper parameters
+    Ray ray(rayOrigin, rayDir, tMin, tMax);
+    
+    // Debug output
+    std::wstringstream ss;
+    ss << L"[GetSelectedIndices] Ray: Origin (" << rayOrigin.x << ", " << rayOrigin.y << ", " << rayOrigin.z 
+       << ") Dir (" << rayDir.x << ", " << rayDir.y << ", " << rayDir.z 
+       << ") tMin: " << tMin << " tMax: " << tMax << "\n";
+    OutputDebugString(ss.str().c_str());
+    
     controller.findRayIntersection(ray, outMeshIndex, outFaceIndex);
 }
 
@@ -354,8 +372,17 @@ LRESULT CALLBACK ChildWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
         g_clickPoint.x = LOWORD(lParam);
         g_clickPoint.y = HIWORD(lParam);
         
+        OutputDebugString(L"WM_RBUTTONDOWN event received\n");
+        
         // Determine which mesh (if any) is at the click position
         GetSelectedIndices(g_clickPoint.x, g_clickPoint.y, g_selectedMeshIdx, g_selectedFaceIdx);
+        
+        // Debug output
+        std::wstringstream ss;
+        ss << L"Right-click detected at (" << g_clickPoint.x << ", " << g_clickPoint.y 
+           << "), selected mesh index: " << g_selectedMeshIdx 
+           << ", selected face index: " << g_selectedFaceIdx << "\n";
+        OutputDebugString(ss.str().c_str());
         
         // Only show context menu if an object was clicked
         if (g_selectedMeshIdx >= 0) {
@@ -370,7 +397,11 @@ LRESULT CALLBACK ChildWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
                 TrackPopupMenu(hSubMenu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, 
                               pt.x, pt.y, 0, GetParent(hWnd), NULL);
                 DestroyMenu(hMenu);
+            } else {
+                OutputDebugString(L"Failed to load context menu resource\n");
             }
+        } else {
+            OutputDebugString(L"No object selected, context menu not shown\n");
         }
     }
         break;
@@ -423,6 +454,13 @@ INT_PTR CALLBACK ObjectDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
         // Initialize the dialog (e.g., populate the combo box)
         SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Cube");
         SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Pyramid");
+        SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Circle");
+        SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Cylinder");
+        SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Sphere");
+        SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Cone");
+        SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Torus");
+        SendDlgItemMessage(hDlg, IDC_OBJECT_TYPE, CB_ADDSTRING, 0, (LPARAM)L"Plane");
+        ShowWindow(GetDlgItem(hDlg, IDC_SIZE), SW_HIDE); // Hide the size input field
         return (INT_PTR)TRUE;
 
     case WM_COMMAND:
@@ -432,20 +470,18 @@ INT_PTR CALLBACK ObjectDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             wchar_t objectType[50];
             GetDlgItemText(hDlg, IDC_OBJECT_TYPE, objectType, 50);
 
-            wchar_t posX[10], posY[10], posZ[10], size[10];
+            wchar_t posX[10], posY[10], posZ[10];
             GetDlgItemText(hDlg, IDC_POSITION_X, posX, 10);
             GetDlgItemText(hDlg, IDC_POSITION_Y, posY, 10);
             GetDlgItemText(hDlg, IDC_POSITION_Z, posZ, 10);
-            GetDlgItemText(hDlg, IDC_SIZE, size, 10);
 
             // Convert input to appropriate types
             float x = _wtof(posX);
             float y = _wtof(posY);
             float z = _wtof(posZ);
-            float ObjectSize = _wtof(size);
 
-            // Create the object (example: create a cube)
-			controller.createDialogHandle(objectType,x,y,z,ObjectSize);
+            // Create the object
+            controller.createDialogHandle(objectType, x, y, z);
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;
@@ -471,8 +507,11 @@ INT_PTR CALLBACK PropertiesDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
             const Mesh& mesh = model.meshes[g_selectedMeshIdx];
             
             // Initialize dialog with mesh values
-            // Convert float values to strings and set them in the dialog
-            wchar_t buffer[32];
+            wchar_t buffer[64];
+            
+            // Object identity
+            SetDlgItemTextA(hDlg, IDC_PROP_NAME, mesh.objectName.c_str());
+            SetDlgItemTextA(hDlg, IDC_PROP_TYPE, mesh.objectType.c_str());
             
             // Rotation
             swprintf_s(buffer, L"%.2f", mesh.rotationX);
@@ -489,6 +528,46 @@ INT_PTR CALLBACK PropertiesDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
             SetDlgItemText(hDlg, IDC_PROP_POS_Y, buffer);
             swprintf_s(buffer, L"%.2f", mesh.centerZ);
             SetDlgItemText(hDlg, IDC_PROP_POS_Z, buffer);
+            
+            // Scale - these should now persist
+            swprintf_s(buffer, L"%.2f", mesh.scaleX);
+            SetDlgItemText(hDlg, IDC_PROP_SCALE_X, buffer);
+            swprintf_s(buffer, L"%.2f", mesh.scaleY);
+            SetDlgItemText(hDlg, IDC_PROP_SCALE_Y, buffer);
+            swprintf_s(buffer, L"%.2f", mesh.scaleZ);
+            SetDlgItemText(hDlg, IDC_PROP_SCALE_Z, buffer);
+            
+            // Bounding box size information
+            glm::vec3 boundingBoxSize = mesh.getTightDimensions();
+            swprintf_s(buffer, L"X: %.2f, Y: %.2f, Z: %.2f", boundingBoxSize.x, boundingBoxSize.y, boundingBoxSize.z);
+            SetDlgItemText(hDlg, IDC_BOUNDING_BOX_SIZE, buffer);
+            
+            // Color
+            swprintf_s(buffer, L"%.2f", mesh.colorR);
+            SetDlgItemText(hDlg, IDC_PROP_COLOR_R, buffer);
+            swprintf_s(buffer, L"%.2f", mesh.colorG);
+            SetDlgItemText(hDlg, IDC_PROP_COLOR_G, buffer);
+            swprintf_s(buffer, L"%.2f", mesh.colorB);
+            SetDlgItemText(hDlg, IDC_PROP_COLOR_B, buffer);
+            
+            // Material properties
+            swprintf_s(buffer, L"%.2f", mesh.transparency);
+            SetDlgItemText(hDlg, IDC_PROP_TRANSPARENCY, buffer);
+            swprintf_s(buffer, L"%.2f", mesh.shininess);
+            SetDlgItemText(hDlg, IDC_PROP_SHINY, buffer);
+            
+            // Material types combo box
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_RESETCONTENT, 0, 0); // Clear existing items
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_ADDSTRING, 0, (LPARAM)L"Default");
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_ADDSTRING, 0, (LPARAM)L"Plastic");
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_ADDSTRING, 0, (LPARAM)L"Metal");
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_ADDSTRING, 0, (LPARAM)L"Glass");
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_ADDSTRING, 0, (LPARAM)L"Wood");
+            SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_SETCURSEL, mesh.materialType, 0);
+            
+            // Display options
+            CheckDlgButton(hDlg, IDC_PROP_WIREFRAME, mesh.wireframeMode ? BST_CHECKED : BST_UNCHECKED);
+            CheckDlgButton(hDlg, IDC_PROP_VISIBILITY, mesh.isVisible ? BST_CHECKED : BST_UNCHECKED);
         }
         return (INT_PTR)TRUE;
 
@@ -498,27 +577,77 @@ INT_PTR CALLBACK PropertiesDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
             if (g_selectedMeshIdx >= 0 && g_selectedMeshIdx < (int)model.meshes.size())
             {
                 // Get values from dialog
-                wchar_t buffer[32];
-                float rotX, rotY, rotZ, posX, posY, posZ;
+                wchar_t buffer[64];
                 
+                // Object identity
+                char nameBuffer[64] = {0};
+                GetDlgItemTextA(hDlg, IDC_PROP_NAME, nameBuffer, 64);
+                std::string objectName = nameBuffer;
+                
+                // Transform values
                 // Rotation
-                GetDlgItemText(hDlg, IDC_PROP_ROT_X, buffer, 32);
+                float rotX, rotY, rotZ;
+                GetDlgItemText(hDlg, IDC_PROP_ROT_X, buffer, 64);
                 rotX = (float)_wtof(buffer);
-                GetDlgItemText(hDlg, IDC_PROP_ROT_Y, buffer, 32);
+                GetDlgItemText(hDlg, IDC_PROP_ROT_Y, buffer, 64);
                 rotY = (float)_wtof(buffer);
-                GetDlgItemText(hDlg, IDC_PROP_ROT_Z, buffer, 32);
+                GetDlgItemText(hDlg, IDC_PROP_ROT_Z, buffer, 64);
                 rotZ = (float)_wtof(buffer);
                 
                 // Position
-                GetDlgItemText(hDlg, IDC_PROP_POS_X, buffer, 32);
+                float posX, posY, posZ;
+                GetDlgItemText(hDlg, IDC_PROP_POS_X, buffer, 64);
                 posX = (float)_wtof(buffer);
-                GetDlgItemText(hDlg, IDC_PROP_POS_Y, buffer, 32);
+                GetDlgItemText(hDlg, IDC_PROP_POS_Y, buffer, 64);
                 posY = (float)_wtof(buffer);
-                GetDlgItemText(hDlg, IDC_PROP_POS_Z, buffer, 32);
+                GetDlgItemText(hDlg, IDC_PROP_POS_Z, buffer, 64);
                 posZ = (float)_wtof(buffer);
                 
-                // Update the mesh using the Model's method which will also rebuild the spatial accelerator
-                model.updateMeshProperties(g_selectedMeshIdx, rotX, rotY, rotZ, posX, posY, posZ);
+                // Scale - should now persist between updates
+                float scaleX, scaleY, scaleZ;
+                GetDlgItemText(hDlg, IDC_PROP_SCALE_X, buffer, 64);
+                scaleX = (float)_wtof(buffer);
+                GetDlgItemText(hDlg, IDC_PROP_SCALE_Y, buffer, 64);
+                scaleY = (float)_wtof(buffer);
+                GetDlgItemText(hDlg, IDC_PROP_SCALE_Z, buffer, 64);
+                scaleZ = (float)_wtof(buffer);
+                
+                // Color
+                float colorR, colorG, colorB;
+                GetDlgItemText(hDlg, IDC_PROP_COLOR_R, buffer, 64);
+                colorR = (float)_wtof(buffer);
+                GetDlgItemText(hDlg, IDC_PROP_COLOR_G, buffer, 64);
+                colorG = (float)_wtof(buffer);
+                GetDlgItemText(hDlg, IDC_PROP_COLOR_B, buffer, 64);
+                colorB = (float)_wtof(buffer);
+                
+                // Material properties
+                float transparency, shininess;
+                GetDlgItemText(hDlg, IDC_PROP_TRANSPARENCY, buffer, 64);
+                transparency = (float)_wtof(buffer);
+                GetDlgItemText(hDlg, IDC_PROP_SHINY, buffer, 64);
+                shininess = (float)_wtof(buffer);
+                
+                int materialType = SendDlgItemMessage(hDlg, IDC_PROP_MATERIAL, CB_GETCURSEL, 0, 0);
+                
+                // Display options
+                bool wireframe = (IsDlgButtonChecked(hDlg, IDC_PROP_WIREFRAME) == BST_CHECKED);
+                bool visible = (IsDlgButtonChecked(hDlg, IDC_PROP_VISIBILITY) == BST_CHECKED);
+                
+                // Update the mesh properties
+                Mesh& mesh = model.meshes[g_selectedMeshIdx];
+                mesh.objectName = objectName;
+                
+                // Update all mesh properties using the enhanced Model method
+                model.updateMeshAllProperties(
+                    g_selectedMeshIdx,
+                    rotX, rotY, rotZ,
+                    posX, posY, posZ,
+                    scaleX, scaleY, scaleZ,
+                    colorR, colorG, colorB,
+                    transparency, shininess, materialType,
+                    wireframe, visible
+                );
             }
             
             EndDialog(hDlg, LOWORD(wParam));
