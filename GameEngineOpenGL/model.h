@@ -11,17 +11,26 @@
 #include "spacialaccelerator.h"
 #include "ProjectionSystem.h"
 #include <memory>
+#include <shared_mutex>
+#include <mutex>
 
 class Model {
-public:
-	Camera camera;
+private:
+    Camera camera;
 	std::vector<Mesh> meshes;
 	Grid grid;
     std::unique_ptr<SpatialAccelerator> accelerator;
     std::unique_ptr<ViewProjMethodGLM> projectionMethod;
+    // Thread synchronization 
+    mutable std::shared_mutex meshesMutex;           // Primary lock for meshes vector
+    mutable std::shared_mutex acceleratorMutex;     // Lock for spatial accelerator
+    mutable std::mutex cameraMutex;                  // Lock for camera operations
+    mutable std::mutex projectionMutex;             // Lock for projection changes
     
-	Model() : camera(), grid(camera) {
+public:
+		Model() : camera(), grid(camera) {
         // Create the appropriate spatial accelerator based on optimization mode
+        std::unique_lock<std::shared_mutex> acceleratorLock(acceleratorMutex);
         accelerator.reset(SpatialAcceleratorFactory::createAccelerator());
 	}
 
@@ -34,13 +43,16 @@ public:
 	}
 
     void buildAccelerator() {
+        std::shared_lock<std::shared_mutex> meshesReadLock(meshesMutex);
+        std::unique_lock<std::shared_mutex> acceleratorLock(acceleratorMutex);
         if (accelerator) {
             accelerator->build(meshes);
-    }
+        }
     }
 
-	// Get Projection Matrix
+	// Get Projection Matrix - thread-safe read
 	glm::mat4 getProjectionMatrix() const {
+        std::lock_guard<std::mutex> lock(projectionMutex);
 		if (projectionMethod) {
 			return projectionMethod->getComposedProjectionMatrix();
         }
@@ -49,6 +61,9 @@ public:
 
     // Call this whenever screen size or camera mode changes
     void updateProjection(int width, int height) {
+        std::lock_guard<std::mutex> cameraLock(cameraMutex);
+        std::lock_guard<std::mutex> projectionLock(projectionMutex);
+        
         // Update the aspect ratio based on the window size
         float aspect = float(width) / float(height);
         
@@ -71,6 +86,7 @@ public:
         }
     }
 
+    // Thread-safe drawing with read-only access to meshes
 	void draw(int width, int height) {
 		// Clear the color and depth buffer
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -78,30 +94,46 @@ public:
 		// Set Projection Matrix
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
-        if (projectionMethod) {
-            glm::mat4 proj = projectionMethod->getComposedProjectionMatrix();
-        glLoadMatrixf(glm::value_ptr(proj));
+        {
+            std::lock_guard<std::mutex> lock(projectionMutex);
+            if (projectionMethod) {
+                glm::mat4 proj = projectionMethod->getComposedProjectionMatrix();
+                glLoadMatrixf(glm::value_ptr(proj));
+            }
         }
 
 		// Set Model View Matrix
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
-		glLoadMatrixf(glm::value_ptr(camera.getViewMatrix()));
+        {
+            std::lock_guard<std::mutex> lock(cameraMutex);
+            glLoadMatrixf(glm::value_ptr(camera.getViewMatrix()));
+        }
 
 		// Draw the plane grid
         grid.drawXZGrid();
 
-		// Draw the meshes
-		for (const auto& mesh : meshes) {
-			mesh.draw();
-			mesh.drawLocalAxis(); // Draw local axis for each mesh
-		}
+		// Draw the meshes with shared (read) lock
+        {
+            std::shared_lock<std::shared_mutex> meshesLock(meshesMutex);
+            for (const auto& mesh : meshes) {
+                mesh.draw();
+                mesh.drawLocalAxis(); // Draw local axis for each mesh
+            }
+        }
+    }
 
+    // Thread-safe camera access
+    std::pair<std::unique_lock<std::mutex>, Camera&> getCameraThreadSafe() {
+        std::unique_lock<std::mutex> lock(cameraMutex);
+        return { std::move(lock), camera };
     }
 
     // Update mesh properties and rebuild spatial accelerator
     void updateMeshProperties(int meshIndex, float rotX, float rotY, float rotZ, 
                               float posX, float posY, float posZ) {
+        std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+        
         if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size())) {
             Mesh& mesh = meshes[meshIndex];
             
@@ -116,6 +148,9 @@ public:
             // Update the mesh geometry
             mesh.updateMesh();
             
+            // Release meshes lock before rebuilding accelerator 
+            meshesLock.unlock();
+            
             // Rebuild spatial accelerator because mesh geometry changed
             buildAccelerator();
         }
@@ -129,6 +164,8 @@ public:
                                float colorR, float colorG, float colorB, 
                                float transparency, float shininess, int materialType,
                                bool wireframe, bool visible) {
+        std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+        
         if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size())) {
             Mesh& mesh = meshes[meshIndex];
             
@@ -173,11 +210,15 @@ public:
             // Always update the mesh to apply all changes
             mesh.updateMesh();
             
+            // Release meshes lock before rebuilding accelerator
+            meshesLock.unlock();
+            
             // Rebuild spatial accelerator because mesh geometry changed
             buildAccelerator();
         }
     }
 
+    // Thread-safe mesh creation methods
     void createCube(int x, int y, int z) {
         Mesh mesh;
 
@@ -236,10 +277,13 @@ public:
         mesh.colorG = 0.0f;
         mesh.colorB = 0.0f;
         
-        meshes.push_back(mesh);
-		buildAccelerator();
+        // Thread-safe mesh addition
+        {
+            std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+            meshes.push_back(mesh);
+        }
+        buildAccelerator();
     }
-
 
     void createPyramid(int x, int y, int z) {
         Mesh mesh;
@@ -281,7 +325,11 @@ public:
        mesh.colorG = 1.0f;
        mesh.colorB = 0.0f;
        
-       meshes.push_back(mesh);
+       // Thread-safe mesh addition
+       {
+           std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+           meshes.push_back(mesh);
+       }
        buildAccelerator();
     }
 
@@ -332,7 +380,11 @@ public:
         mesh.colorG = 0.0f;
         mesh.colorB = 1.0f;
         
-        meshes.push_back(mesh);
+        // Thread-safe mesh addition
+        {
+            std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+            meshes.push_back(mesh);
+        }
         buildAccelerator();
     }
 
@@ -399,7 +451,11 @@ public:
         mesh.colorG = 0.0f;
         mesh.colorB = 0.0f;
         
-        meshes.push_back(mesh);
+        // Thread-safe mesh addition
+        {
+            std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+            meshes.push_back(mesh);
+        }
         buildAccelerator();
     }
 
@@ -453,7 +509,11 @@ public:
         mesh.colorG = 0.5f;
         mesh.colorB = 0.5f;
         
-        meshes.push_back(mesh);
+        // Thread-safe mesh addition
+        {
+            std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+            meshes.push_back(mesh);
+        }
         buildAccelerator();
     }
 
@@ -510,7 +570,11 @@ public:
         mesh.colorG = 0.5f;
         mesh.colorB = 0.0f;
         
-        meshes.push_back(mesh);
+        // Thread-safe mesh addition
+        {
+            std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+            meshes.push_back(mesh);
+        }
         buildAccelerator();
     }
 
@@ -565,7 +629,11 @@ public:
         mesh.colorG = 1.0f;
         mesh.colorB = 0.0f;
         
-        meshes.push_back(mesh);
+        // Thread-safe mesh addition
+        {
+            std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+            meshes.push_back(mesh);
+        }
         buildAccelerator();
     }
 
@@ -601,14 +669,22 @@ public:
         mesh.colorG = 1.0f;
         mesh.colorB = 0.0f;
         
-        meshes.push_back(mesh);
+        // Thread-safe mesh addition
+        {
+            std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+            meshes.push_back(mesh);
+        }
         buildAccelerator();
     }
 
     void createFromFile(std::wstring filePath) {
 		Mesh mesh;
 		if (mesh.loadFromSTL(std::string(filePath.begin(), filePath.end()))) {
-			meshes.push_back(mesh);
+            // Thread-safe mesh addition
+            {
+                std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+                meshes.push_back(mesh);
+            }
 			buildAccelerator();
 			MessageBox(NULL, L"File loaded successfully!", L"Info", MB_OK);
 		} 
@@ -618,9 +694,137 @@ public:
     }
     
     void deleteMesh(int index) {
+        std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+        
         if (index >= 0 && index < static_cast<int>(meshes.size())) {
             meshes.erase(meshes.begin() + index);
+            
+            // Release lock before rebuilding accelerator
+            meshesLock.unlock();
             buildAccelerator();
+        }
+    }
+
+    // Thread-safe mesh access methods
+    size_t getMeshCount() const {
+        std::shared_lock<std::shared_mutex> lock(meshesMutex);
+        return meshes.size();
+    }
+
+    bool getMeshProperties(int index, Mesh& outMesh) const {
+        std::shared_lock<std::shared_mutex> lock(meshesMutex);
+        if (index >= 0 && index < static_cast<int>(meshes.size())) {
+            outMesh = meshes[index];
+            return true;
+        }
+        return false;
+    }
+
+    // --- Thread-safe selection and mesh state methods ---
+    void selectMesh(int meshIndex) {
+        std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+        if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size())) {
+            meshes[meshIndex].isSelected = true;
+            meshes[meshIndex].selectedFaceIndex = -1;
+        }
+    }
+
+    void selectFace(int meshIndex, int faceIndex) {
+        std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+        if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size())) {
+            Mesh& mesh = meshes[meshIndex];
+            if (faceIndex >= 0 && faceIndex < static_cast<int>(mesh.faces.size())) {
+                mesh.isSelected = true;
+                mesh.selectedFaceIndex = faceIndex;
+            }
+        }
+    }
+
+    void clearAllSelections() {
+        std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+        for (auto& mesh : meshes) {
+            mesh.isSelected = false;
+            mesh.selectedFaceIndex = -1;
+        }
+    }
+
+    bool isMeshSelected(int meshIndex) const {
+        std::shared_lock<std::shared_mutex> meshesLock(meshesMutex);
+        if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size())) {
+            return meshes[meshIndex].isSelected;
+        }
+        return false;
+    }
+
+    int getSelectedFaceIndex(int meshIndex) const {
+        std::shared_lock<std::shared_mutex> meshesLock(meshesMutex);
+        if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size())) {
+            return meshes[meshIndex].selectedFaceIndex;
+        }
+        return -1;
+    }
+
+    void toggleMeshBoundingBox(int meshIndex) {
+        std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+        if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size())) {
+            meshes[meshIndex].showBoundingBox = !meshes[meshIndex].showBoundingBox;
+        }
+    }
+
+    void toggleMeshVertices(int meshIndex) {
+        std::unique_lock<std::shared_mutex> meshesLock(meshesMutex);
+        if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size())) {
+            meshes[meshIndex].showVertices = !meshes[meshIndex].showVertices;
+        }
+    }
+
+    glm::vec3 getMeshCenter(int meshIndex) const {
+        std::shared_lock<std::shared_mutex> meshesLock(meshesMutex);
+        if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size())) {
+            return meshes[meshIndex].getCenter();
+        }
+        return glm::vec3(0.0f);
+    }
+
+    glm::vec3 getMeshSize(int meshIndex) const {
+        std::shared_lock<std::shared_mutex> meshesLock(meshesMutex);
+        if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size())) {
+            return meshes[meshIndex].getSize();
+        }
+        return glm::vec3(0.0f);
+    }
+
+    void setCameraOrbitMode(bool enabled, const glm::vec3& target = glm::vec3(0.0f), float distance = 10.0f) {
+        std::lock_guard<std::mutex> lock(cameraMutex);
+        camera.setOrbitMode(enabled, target, distance);
+    }
+
+    bool isCameraOrbitMode() const {
+        std::lock_guard<std::mutex> lock(cameraMutex);
+        return camera.isOrbitMode();
+    }
+
+    void setCameraMode(unsigned int mode) {
+        std::lock_guard<std::mutex> lock(cameraMutex);
+        camera.setCameraMode(mode);
+    }
+
+    void zoomCameraToBoundingBox(const glm::vec3& center, const glm::vec3& size, float aspectRatio) {
+        std::lock_guard<std::mutex> lock(cameraMutex);
+        camera.zoomToBoundingBox(center, size, aspectRatio);
+    }
+
+    // Thread-safe accelerator access for ray tracing
+    void findRayIntersection(const Ray& ray, std::vector<Face*>& hitFaces) const {
+        std::shared_lock<std::shared_mutex> acceleratorLock(acceleratorMutex);
+        
+        if (accelerator) {
+        #if SPACIAL_OPT_MODE == SPACIAL_OPT_MEMORY
+            void* root = static_cast<BVH*>(accelerator.get())->getRoot();
+        #else
+            void* root = static_cast<KDTree*>(accelerator.get())->getRoot();
+        #endif
+            accelerator->traverse(root, ray, hitFaces);
         }
     }
 };

@@ -5,7 +5,7 @@
 #include <thread>
 #include <commdlg.h>
 #include <string>
-
+#include <mutex>
 
 class Controller {
 public:
@@ -19,6 +19,8 @@ public:
 	int mouseY;
 	int selectedMeshIndex; // Track the currently selected mesh index
 	int selectedFaceIndex; // Track the currently selected face index
+
+	mutable std::mutex selectionMutex; // Protects selection state
 
 	Controller(Model* model, View* view) : model(model), view(view), mouseX(0), mouseY(0),
 		handle(NULL), parentHandle(NULL),
@@ -68,41 +70,53 @@ public:
 	}
 
 	void handleKeyboardInput(WPARAM wParam) {
+        // Get thread-safe camera copy and update it
+		auto result = model->getCameraThreadSafe();
+		auto& lock = result.first;
+		auto& camera = result.second;
+        
 		switch (wParam) {
 		case 'W':
-			model->camera.move(FORWARD, 0.01f);
+			camera.move(FORWARD, 0.01f);
 			break;
 		case 'S':
-			model->camera.move(BACKWARD, 0.01f);
+			camera.move(BACKWARD, 0.01f);
 			break;
 		case 'A':
-			model->camera.move(LEFT, 0.01f);
+			camera.move(LEFT, 0.01f);
 			break;
 		case 'D':
-			model->camera.move(RIGHT, 0.01f);
+			camera.move(RIGHT, 0.01f);
 			break;
 		case VK_ESCAPE:
 			break;
 		default:
-			break;
+			return; // No change needed
 		}
 	}
 
 	void zoomIn() {
-		model->camera.zoomIn(0.1f);
+		auto result = model->getCameraThreadSafe();
+		auto& lock = result.first;
+		auto& camera = result.second;
+
+		camera.zoomIn(0.1f);
 		view->setWindowSize(view->getWindowWidth(), view->getWindowHeight());
 	}
 
 	void zoomOut() {
-		model->camera.zoomOut(0.1f);
+		auto result = model->getCameraThreadSafe();
+		auto& lock = result.first;
+		auto& camera = result.second;
+
+		camera.zoomOut(0.1f);
 		view->setWindowSize(view->getWindowWidth(), view->getWindowHeight());
 	}
 
-	// Clear selection for all meshes
+	// Thread-safe selection methods
 	void clearAllSelections() {
-		for (auto& mesh : model->meshes) {
-			mesh.setSelected(false);
-		}
+		std::lock_guard<std::mutex> lock(selectionMutex);
+		model->clearAllSelections();
 		selectedMeshIndex = -1;
 		selectedFaceIndex = -1;
 	}
@@ -111,9 +125,13 @@ public:
 	void handleMouseInput(WPARAM state, float x, float y) {
 		if (state == MK_LBUTTON)
 		{
+			auto result = model->getCameraThreadSafe();
+			auto& lock = result.first;
+			auto& camera = result.second;
+
 			float mouseDeltaX = (x - mouseX);
 			float mouseDeltaY = (y - mouseY);
-			model->camera.rotateBy(mouseDeltaX, mouseDeltaY);
+			camera.rotateBy(mouseDeltaX, mouseDeltaY);
 			mouseX = x;
 			mouseY = y;
 		}
@@ -178,15 +196,20 @@ public:
 	void handleMouseDown(WPARAM state, float x, float y) {
 		mouseX = x;
 		mouseY = y;
-		// 1. Get camera matrices and window size
-		glm::mat4 viewMatrix = model->camera.getViewMatrix();
+		
+        // Get thread-safe camera and projection data
+		auto result = model->getCameraThreadSafe();
+		auto& lock = result.first;
+		auto& camera = result.second;
+
+		glm::mat4 viewMatrix = camera.getViewMatrix();
 		glm::mat4 projMatrix = model->getProjectionMatrix();
 		int width = view->getWindowWidth();
 		int height = view->getWindowHeight();
 
 		// 2. Convert screen point to ray
 		glm::vec3 rayOrigin, rayDir;
-		screenPointToRay(x, y, width, height, viewMatrix, projMatrix, model->camera, rayOrigin, rayDir);
+		screenPointToRay(x, y, width, height, viewMatrix, projMatrix, camera, rayOrigin, rayDir);
 
 		// 3. Perform ray test to find intersections and track both mesh and face indices
 		int meshIndex = -1;
@@ -197,14 +220,14 @@ public:
 		float tMax = std::numeric_limits<float>::max();
 		
 		// For orthographic mode, use a large ray range since we could have objects in negative space
-		if (model->camera.mode == ORTHOGRAPHIC_MODE) {
+		if (camera.mode == ORTHOGRAPHIC_MODE) {
 			tMin = -std::numeric_limits<float>::max(); // Allow intersections behind the ray origin
 			tMax = std::numeric_limits<float>::max();
 		}
 		
 		Ray ray(rayOrigin, rayDir, tMin, tMax);
 		findRayIntersection(ray, meshIndex, faceIndex);
-        
+
         // 4. Selection logic:
         if (meshIndex >= 0) {
             // Clicked on an object
@@ -233,20 +256,20 @@ public:
 
         // Save the selected mesh index for the controller state
 		selectedMeshIndex = meshIndex;
-	}
+                }
 
 	void selectMesh(int meshIndex) {
-	    if (meshIndex >= 0 && meshIndex < static_cast<int>(model->meshes.size())) {
-	        model->meshes[meshIndex].setSelected(true);
-	    }
+	    std::lock_guard<std::mutex> lock(selectionMutex);
+	    model->selectMesh(meshIndex);
+	    selectedMeshIndex = meshIndex;
+	    selectedFaceIndex = -1;
 	}
 	
 	void selectFace(int meshIndex, int faceIndex) {
-	    if (meshIndex >= 0 && meshIndex < static_cast<int>(model->meshes.size())) {
-	        if (faceIndex >= 0 && faceIndex < static_cast<int>(model->meshes[meshIndex].faces.size())) {
-	            model->meshes[meshIndex].selectFace(faceIndex);
-	        }
-	    }
+	    std::lock_guard<std::mutex> lock(selectionMutex);
+	    model->selectFace(meshIndex, faceIndex);
+	    selectedMeshIndex = meshIndex;
+	    selectedFaceIndex = faceIndex;
 	}
 
 	void createDialogHandle(wchar_t* objectType, int x, int y, int z) {
@@ -323,61 +346,62 @@ public:
 	}
 
 	Mesh* getSelectedMesh() {
-		if (selectedMeshIndex >= 0 && selectedMeshIndex < (int)model->meshes.size()) {
-			return &model->meshes[selectedMeshIndex];
+		std::lock_guard<std::mutex> lock(selectionMutex);
+		static Mesh meshCopy;
+		if (selectedMeshIndex >= 0 && model->getMeshProperties(selectedMeshIndex, meshCopy)) {
+			return &meshCopy;
 		}
 		return nullptr;
 	}
 
 	void toggleOrbitAroundObject() {
+		std::lock_guard<std::mutex> lock(selectionMutex);
 		Mesh* selectedMesh = getSelectedMesh();
 		if (selectedMesh) {
-			if (model->camera.isOrbitMode()) {
-				model->camera.setOrbitMode(false);
+			if (model->isCameraOrbitMode()) {
+				model->setCameraOrbitMode(false);
+			} else {
+				model->setCameraOrbitMode(true, selectedMesh->getCenter(), 10.0f);
 			}
-			else {
-				model->camera.setOrbitMode(true, selectedMesh->getCenter(), 10.0f);
-			}
-		}
-		else {
+		} else {
 			MessageBox(parentHandle, L"No object selected", L"Error", MB_OK);
 		}
 	}
 
 	void deleteSelectedObject() {
-		if (selectedMeshIndex >= 0 && selectedMeshIndex < (int)model->meshes.size()) {
+		std::lock_guard<std::mutex> lock(selectionMutex);
+		if (selectedMeshIndex >= 0) {
 			model->deleteMesh(selectedMeshIndex);
-			selectedMeshIndex = -1; // Reset selection
+			selectedMeshIndex = -1;
 			selectedFaceIndex = -1;
 		}
 	}
 
 	void toggleBoundingBox() {
-		Mesh* selectedMesh = getSelectedMesh();
-		if (selectedMesh) {
-			selectedMesh->toggleBoundingBox();
-		}
-		else {
+		std::lock_guard<std::mutex> lock(selectionMutex);
+		if (selectedMeshIndex >= 0) {
+			model->toggleMeshBoundingBox(selectedMeshIndex);
+		} else {
 			MessageBox(parentHandle, L"No object selected", L"Error", MB_OK);
 		}
 	}
 
 	void toggleVertices() {
-		Mesh* selectedMesh = getSelectedMesh();
-		if (selectedMesh) {
-			selectedMesh->toggleVertices();
-		}
-		else {
+		std::lock_guard<std::mutex> lock(selectionMutex);
+		if (selectedMeshIndex >= 0) {
+			model->toggleMeshVertices(selectedMeshIndex);
+		} else {
 			MessageBox(parentHandle, L"No object selected", L"Error", MB_OK);
 		}
 	}
 
-	void fitOjbectToView() {
-		Mesh* selectedMesh = getSelectedMesh();
-		if (selectedMesh) {
-			model->camera.zoomToBoundingBox(selectedMesh->getCenter(), selectedMesh->getSize(), view->getAspectRatio());
-		}
-		else {
+	void fitObjectToView() {
+		std::lock_guard<std::mutex> lock(selectionMutex);
+		if (selectedMeshIndex >= 0) {
+			glm::vec3 center = model->getMeshCenter(selectedMeshIndex);
+			glm::vec3 size = model->getMeshSize(selectedMeshIndex);
+			model->zoomCameraToBoundingBox(center, size, view->getAspectRatio());
+		} else {
 			MessageBox(parentHandle, L"No object selected", L"Error", MB_OK);
 		}
 	}
@@ -391,15 +415,8 @@ public:
 		float closestDistance = std::numeric_limits<float>::max();
 		Face* closestFace = nullptr;
 		
-		// Use the spatial accelerator to efficiently get hit faces
-		if (model->accelerator) {
-		#if SPACIAL_OPT_MODE == SPACIAL_OPT_MEMORY
-			void* root = static_cast<BVH*>(model->accelerator.get())->getRoot();
-		#else
-			void* root = static_cast<KDTree*>(model->accelerator.get())->getRoot();
-		#endif
-			model->accelerator->traverse(root, ray, hitFaces);
-		}
+		// Use thread-safe accelerator access
+        model->findRayIntersection(ray, hitFaces);
 		
 		if (!hitFaces.empty()) {
 			// Find the closest face by computing distances
@@ -411,52 +428,26 @@ public:
 					closestFace = face;
 				}
 			}
-			
 			// Find which mesh and face index this belongs to
 			if (closestFace != nullptr) {
-				for (size_t m = 0; m < model->meshes.size(); ++m) {
-					const Mesh& mesh = model->meshes[m];
-					for (size_t f = 0; f < mesh.faces.size(); ++f) {
-						if (&mesh.faces[f] == closestFace) {
-							outMeshIndex = static_cast<int>(m);
-							outFaceIndex = static_cast<int>(f);
-							return;
+				Mesh meshCopy;
+				for (size_t m = 0; m < model->getMeshCount(); ++m) {
+					if (model->getMeshProperties(static_cast<int>(m), meshCopy)) {
+						for (size_t f = 0; f < meshCopy.faces.size(); ++f) {
+							// Compare face indices (since addresses won't match due to copies)
+							if (meshCopy.faces[f].v0 == closestFace->v0 &&
+								meshCopy.faces[f].v1 == closestFace->v1 &&
+								meshCopy.faces[f].v2 == closestFace->v2) {
+								outMeshIndex = static_cast<int>(m);
+								outFaceIndex = static_cast<int>(f);
+								return;
+							}
 						}
 					}
 				}
 			}
 		}
-		
 		// If we didn't hit any faces or couldn't identify the mesh/face, leave outputs as -1
 	}
 
-	// Returns the index of the intersected mesh, or -1 if no intersection
-	int testRayIntersections(float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
-		// Set appropriate ray range based on camera mode
-		float tMin = 0.0f;
-		float tMax = std::numeric_limits<float>::max();
-		
-		// For orthographic mode, use a large ray range since we could have objects in negative space
-		if (model->camera.mode == ORTHOGRAPHIC_MODE) {
-			tMin = -std::numeric_limits<float>::max(); // Allow intersections behind the ray origin
-			tMax = std::numeric_limits<float>::max();
-		}
-		
-		Ray ray(glm::vec3(originX, originY, originZ), glm::vec3(dirX, dirY, dirZ), tMin, tMax);
-
-		int meshIndex, faceIndex;
-		findRayIntersection(ray, meshIndex, faceIndex);
-		
-		if (meshIndex != -1) {
-			std::wstringstream ss;
-			ss << L"[Picking] Intersection found: Mesh " << meshIndex;
-			if (faceIndex != -1) {
-				ss << L", Face " << faceIndex;
-			}
-			ss << L"\n";
-			OutputDebugString(ss.str().c_str());
-		}
-		
-		return meshIndex;
-	}
 };

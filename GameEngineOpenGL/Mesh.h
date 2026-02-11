@@ -459,6 +459,7 @@ public:
         size_t expectedFaces = indices.size() / 3;
         if (faces.size() != expectedFaces) {
             faces.resize(expectedFaces);
+            OutputDebugStringA("Debug: Failed - Indices doesnt correlate with faces. \n");
 
             // Reset selection if now invalid
             if (selectedFaceIndex >= static_cast<int>(faces.size())) {
@@ -931,4 +932,7 @@ public:
     bool hasFaceSelected() const {
         return isSelected && selectedFaceIndex >= 0;
     }
+
+// NOTE: All modifications to Mesh state must be performed through Model class methods with proper locking.
+// Do not modify Mesh fields directly from outside Model. See THREAD_SAFETY_DOCUMENTATION.md for details.
 };
